@@ -221,6 +221,8 @@
   let recognition = null;
   let aiEngine = null;
   let aiEnginePromise = null;
+  let visionModel = null;
+  let visionModelPromise = null;
   let isGenerating = false;
   const LOCAL_MODEL_ID = "Qwen3-0.6B-q4f16_1-MLC";
   const AI_SYSTEM_PROMPT = [
@@ -241,8 +243,16 @@
     }catch(error){ return []; }
   }
   function persist(){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations)); }
-    catch(error){ toast("تعذر حفظ المحادثات في هذا المتصفح."); }
+    try{
+      const safeCopy = conversations.map(conversation => ({
+        ...conversation,
+        messages: conversation.messages.map(message => {
+          const {imagePreviewURL, ...savedMessage} = message;
+          return savedMessage;
+        })
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(safeCopy));
+    }catch(error){ toast("تعذر حفظ المحادثات في هذا المتصفح."); }
   }
   function toast(message){
     const el = $("toast");
@@ -318,10 +328,18 @@
     bubble.className = "bubble";
     bubble.textContent = message.text || "";
     body.append(role,bubble);
+    if(message.imagePreviewURL){
+      const image = document.createElement("img");
+      image.src = message.imagePreviewURL;
+      image.alt = "الصورة المرفقة للتحليل";
+      image.loading = "lazy";
+      image.style.cssText = "display:block;max-width:min(100%,420px);max-height:300px;object-fit:contain;border-radius:12px;margin-top:10px;border:1px solid var(--line);background:#f1f4f7";
+      body.appendChild(image);
+    }
     if(message.fileName){
       const chip = document.createElement("div");
       chip.className = "attachment-chip";
-      chip.textContent = "📎 " + message.fileName + " — مرفق محلياً";
+      chip.textContent = "📎 " + message.fileName + (message.imagePreviewURL ? " — صورة أُرسلت للتحليل" : " — مرفق محلياً");
       body.appendChild(chip);
     }
     if(message.role === "user"){
@@ -458,26 +476,137 @@
       scrollBottom();
     }
   }
+  async function loadVisionModel(onProgress){
+    if(visionModel) return visionModel;
+    if(visionModelPromise) return visionModelPromise;
+    visionModelPromise = (async()=>{
+      if(!window.isSecureContext) throw new Error("افتح KHOTWA AI عبر رابط HTTPS لتشغيل تحليل الصور المحلي.");
+      const [aiSdk,browserAi] = await Promise.all([
+        import("https://esm.sh/ai@6?bundle"),
+        import("https://esm.sh/@browser-ai/transformers-js@2?bundle")
+      ]);
+      const model = browserAi.transformersJS("HuggingFaceTB/SmolVLM-256M-Instruct",{
+        isVisionModel:true,
+        device:"auto",
+        dtype:"q4",
+        initProgressCallback:(progress)=>{
+          if(typeof onProgress === "function") onProgress(progress);
+        }
+      });
+      const availability = await model.availability();
+      if(availability === "unavailable"){
+        throw new Error("هذا الجهاز أو المتصفح لا يستطيع تشغيل نموذج تحليل الصور محلياً.");
+      }
+      if(availability === "downloadable"){
+        await model.createSessionWithProgress(progress=>{
+          if(typeof onProgress === "function") onProgress(progress);
+        });
+      }
+      return {model,streamText:aiSdk.streamText};
+    })().then(value=>{
+      visionModel=value;
+      return value;
+    }).catch(error=>{
+      visionModelPromise=null;
+      throw error;
+    });
+    return visionModelPromise;
+  }
+  async function generateVisionReply(conversation,imageFile,userPrompt){
+    const assistantMessage = {role:"assistant",text:"",createdAt:Date.now()};
+    conversation.messages.push(assistantMessage);
+    persist();
+    const row = addMessageToView(assistantMessage,conversation.messages.length-1);
+    const bubble = row.querySelector(".bubble");
+    bubble.textContent = "جارٍ تجهيز نموذج تحليل الصور…";
+    scrollBottom();
+    try{
+      // Keep the photo in this browser. It is converted to bytes and never uploaded to a chat API.
+      const imageBytes = new Uint8Array(await imageFile.arrayBuffer());
+      const {model,streamText} = await loadVisionModel(progress=>{
+        if(bubble){
+          const amount = Number(progress);
+          bubble.textContent = Number.isFinite(amount) && amount > 0
+            ? "جارٍ تنزيل نموذج تحليل الصور… " + Math.round(amount*100) + "%"
+            : "جارٍ تحميل نموذج تحليل الصور لأول مرة…";
+        }
+      });
+      bubble.textContent = "الصورة قيد التحليل…";
+      const prompt = userPrompt || "حلّل هذه الصورة: صف ما يظهر فيها، واقرأ النصوص الواضحة، واذكر ما لا تستطيع التأكد منه.";
+      const result = streamText({
+        model,
+        messages:[
+          {
+            role:"system",
+            content:"You are KHOTWA AI, a careful image analysis assistant. Describe only what is visible. Do not guess hidden details or identify people. If text is blurry or unreadable, say so. Answer in the same language as the user's question. Be concise, helpful, and age-appropriate."
+          },
+          {
+            role:"user",
+            content:[
+              {type:"text",text:prompt},
+              {type:"image",image:imageBytes,mimeType:imageFile.type || "image/jpeg"}
+            ]
+          }
+        ],
+        maxOutputTokens:240,
+        temperature:0.2
+      });
+      bubble.textContent = "";
+      for await (const chunk of result.textStream){
+        if(chunk){
+          assistantMessage.text += chunk;
+          bubble.textContent = assistantMessage.text;
+          updateScrollButton();
+        }
+      }
+      if(!assistantMessage.text.trim()){
+        assistantMessage.text = "لم يتمكن النموذج من إنتاج وصف. جرّب صورة أوضح أو سؤالاً أبسط.";
+        bubble.textContent = assistantMessage.text;
+      }
+    }catch(error){
+      assistantMessage.text = "تعذر تحليل الصورة: " + (error?.message || "حدث خطأ غير معروف") + "\n\nجرّب صورة أصغر أو متصفحاً أحدث يدعم WebGPU/WebAssembly.";
+      bubble.textContent = assistantMessage.text;
+    }finally{
+      conversation.updatedAt = Date.now();
+      persist();
+      renderHistory();
+      scrollBottom();
+    }
+  }
   async function sendMessage(){
     const text = promptBox.value.trim();
     if(isGenerating){toast("انتظر انتهاء الإجابة الحالية أولاً.");return;}
     if(!text && !selectedFile){toast("اكتب رسالة أو أرفق ملفاً أولاً.");return;}
     if(!currentConversation()) createConversation();
     const item = currentConversation();
-    const hasAttachment = !!selectedFile;
-    const message = {role:"user",text,createdAt:Date.now(),fileName:hasAttachment ? selectedFile.name : ""};
+    const attachedFile = selectedFile;
+    const isImage = !!(attachedFile && attachedFile.type && attachedFile.type.startsWith("image/"));
+    const message = {
+      role:"user",
+      text,
+      createdAt:Date.now(),
+      fileName:attachedFile ? attachedFile.name : "",
+      imagePreviewURL:isImage ? URL.createObjectURL(attachedFile) : ""
+    };
     item.messages.push(message);
-    updateCurrentTitle(text || (selectedFile ? selectedFile.name : "محادثة جديدة"));
+    updateCurrentTitle(text || (attachedFile ? attachedFile.name : "محادثة جديدة"));
     persist();
     clearAttachment();
     promptBox.value = "";
     promptBox.style.height = "auto";
     renderConversation();
     renderHistory();
-    if(hasAttachment){
+    if(attachedFile && isImage){
+      isGenerating = true;
+      $("sendBtn").disabled = true;
+      try{ await generateVisionReply(item,attachedFile,text); }
+      finally{ isGenerating = false; $("sendBtn").disabled = false; }
+      return;
+    }
+    if(attachedFile){
       const info = document.createElement("div");
       info.className = "notice";
-      info.textContent = "تم إرفاق الملف وحفظه في المحادثة، لكن تحليل الصور والملفات غير مفعّل بعد. لم يقرأ النموذج محتوى الملف.";
+      info.textContent = "تم إرفاق الملف وحفظ اسمه، لكن تحليل PDF والمستندات غير مفعّل بعد. أرسل صورة بصيغة PNG أو JPG أو WEBP لتحليلها.";
       messagesEl.appendChild(info);
       scrollBottom();
       return;
