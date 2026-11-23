@@ -796,6 +796,11 @@
       const app = appSdk.getApps().length ? appSdk.getApp() : appSdk.initializeApp(firebaseConfig);
       const auth = authSdk.getAuth(app);
       authSdk.onAuthStateChanged(auth,user=>updateAccountState(user));
+      try{
+        await authSdk.getRedirectResult(auth);
+      }catch(error){
+        $("accountStatus").textContent = "تعذر إكمال تسجيل Google: " + (error?.message || "خطأ في إعادة التوجيه.");
+      }
       firebaseAuthContext = {auth,authSdk};
       return firebaseAuthContext;
     })().catch(error=>{
@@ -813,11 +818,7 @@
     }
     const provider = new context.authSdk.GoogleAuthProvider();
     try{
-      if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
-        await context.authSdk.signInWithRedirect(context.auth,provider);
-      }else{
-        await context.authSdk.signInWithPopup(context.auth,provider);
-      }
+      await context.authSdk.signInWithRedirect(context.auth,provider);
     }catch(error){
       $("accountStatus").textContent = "تعذر تسجيل الدخول: " + (error?.message || "تحقق من إعداد Google في Firebase.");
     }
