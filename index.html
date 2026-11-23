@@ -325,9 +325,10 @@
       <article class="plugin-card"><strong>الإملاء الصوتي</strong><small>إدخال الكلام باللغة التي اخترتها.</small><button id="toolVoice">فتح الأداة</button></article>
       <article class="plugin-card"><strong>مشاركة المحادثة</strong><small>إنشاء رابط يشارك نص المحادثة بعد موافقتك.</small><button id="toolShare">إنشاء رابط</button></article>
       <article class="plugin-card"><strong>ترجمة النصوص</strong><small>اطلب من KHOTWA AI ترجمة النص إلى لغة محددة.</small><button id="toolTranslate">بدء الترجمة</button></article>
+      <article class="plugin-card"><strong>بحث موسوعي مباشر</strong><small>ابحث في ويكيبيديا باللغة المناسبة للسؤال، ثم اطلب من النموذج تلخيص المصادر.</small><button id="toolWikiSearch">بحث الآن</button></article>
     </div>
     <div class="plugin-section-title">موصلات خارجية</div>
-    <div class="plugin-note">البحث المباشر على الويب، البريد، التقويم، التخزين السحابي والاتصالات الخارجية غير موصولة حالياً. لا نعرضها كإضافات تعمل حتى نربط خدماتها وصلاحياتها فعلياً.</div>
+    <div class="plugin-note">بحث ويكيبيديا أصبح متاحاً كإضافة مفتوحة دون مفتاح API. البحث الشامل على الويب، البريد، التقويم، التخزين السحابي، إنشاء الصور، وموصلات ChatGPT الخارجية ما زالت تحتاج خدمات API مستقلة وخادماً آمناً للمفاتيح والصلاحيات.</div>
   </section>
 </div>
 <div class="account-overlay hidden" id="accountOverlay" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
@@ -372,7 +373,7 @@
     "Do not default to Arabic or translate the answer into another language unless the user asks. When the user mixes languages, answer mainly in the language of the latest request.",
     "Be clear, useful, honest, and concise. Ask one short clarifying question only when needed.",
     "For Moroccan administrative, social, education, and work topics, explain general steps and say when details must be checked with an official source.",
-    "Never invent official phone numbers, addresses, laws, prices, citations, or live availability. Say when uncertain.",
+    "Never invent official phone numbers, addresses, laws, prices, citations, or live availability. Say when uncertain. When search excerpts and source URLs are supplied in the user message, base claims on those excerpts and include the supplied source titles and URLs where relevant.",
     "Do not ask for passwords, identity numbers, payment information, or other sensitive personal data.",
     "Do not provide instructions that facilitate violence, self-harm, dangerous substances, illegal actions, or age-restricted goods.",
     "You are KHOTWA AI, not ChatGPT."
@@ -409,7 +410,7 @@
     try{return {...defaults,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}")};}catch(error){return defaults;}
   }
   let appSettings = readSettings();
-  if(appSettings.theme==="system"){appSettings.theme="light";try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(appSettings));}catch(error){}}
+  if(localStorage.getItem("khotwa-theme-v2")!=="1"){appSettings.theme="light";try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(appSettings));localStorage.setItem("khotwa-theme-v2","1");}catch(error){}}
   const LANGUAGE_NAMES = {fr:"Français",en:"English",ar:"العربية",es:"Español",de:"Deutsch",it:"Italiano",pt:"Português",tr:"Türkçe",ru:"русский",ja:"日本語",zh:"中文",hi:"हिन्दी",nl:"Nederlands",pl:"Polski",ko:"한국어",vi:"Tiếng Việt",id:"Bahasa Indonesia",bn:"বাংলা",th:"ไทย",he:"עברית",el:"Ελληνικά",fa:"فارسی",ur:"اردو",sw:"Kiswahili",ta:"தமிழ்",te:"తెలుగు",ml:"മലയാളം"};
   function saveSettings(){
     try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(appSettings));}catch(error){}
@@ -454,13 +455,7 @@
     if(/[\u0B80-\u0BFF]/.test(sample)) return "தமிழ்";
     if(/[\u0C00-\u0C7F]/.test(sample)) return "తెలుగు";
     if(/[\u0D00-\u0D7F]/.test(sample)) return "മലയാളം";
-    if(/[\u0980-\u09FF]/.test(sample)) return "বাংলা";
-    if(/[\u0E00-\u0E7F]/.test(sample)) return "ไทย";
-    if(/[\u0590-\u05FF]/.test(sample)) return "עברית";
-    if(/[\u0370-\u03FF]/.test(sample)) return "Ελληνικά";
-    if(/[\u0B80-\u0BFF]/.test(sample)) return "தமிழ்";
-    if(/[\u0C00-\u0C7F]/.test(sample)) return "తెలుగు";
-    if(/[\u0D00-\u0D7F]/.test(sample)) return "മലയാളം";
+
     const words = (sample.match(/[a-zà-ÿ]+/g) || []).join(" ");
     const score = terms => terms.reduce((sum,word)=>sum + ((" " + words + " ").includes(" " + word + " ") ? 1 : 0),0);
     const scores = [
@@ -734,13 +729,14 @@
   }
   async function generateLocalReply(conversation){
     const history = conversation.messages
-      .filter(message => (message.role === "user" || message.role === "assistant") && (message.text || message.pdfExtractedText))
+      .filter(message => (message.role === "user" || message.role === "assistant") && (message.text || message.pdfExtractedText || message.referenceContext))
       .slice(-memoryMessageCount())
       .map(message => ({
         role:message.role,
         content:[
           message.text || (message.pdfExtractedText ? "حلّل ملف PDF المرفق وأجب عن الأسئلة التالية." : ""),
-          message.pdfExtractedText ? "\n\\nنص مستخرج من ملف PDF (مقتطف محلي):\\n" + message.pdfExtractedText : ""
+          message.pdfExtractedText ? "\n\\nنص مستخرج من ملف PDF (مقتطف محلي):\\n" + message.pdfExtractedText : "",
+          message.referenceContext ? "\\n\\nنتائج بحث موسوعي ومقتطفات مصادر:\\n" + message.referenceContext : ""
         ].join("")
       }));
     let engine;
@@ -1102,6 +1098,45 @@
     toast("تم حفظ الإعدادات.");
     if(appSettings.autoStart && !aiEngine) loadLocalAI().catch(()=>{});
   });
+  const WIKI_LANGUAGE_CODES={"العربية":"ar","Français":"fr","English":"en","Español":"es","Português":"pt","Deutsch":"de","Italiano":"it","Türkçe":"tr","русский":"ru","日本語":"ja","中文":"zh","한국어":"ko","हिन्दी":"hi","বাংলা":"bn","ไทย":"th","עברית":"he","Ελληνικά":"el","فارسی":"fa","اردو":"ur","Nederlands":"nl","Polski":"pl","Tiếng Việt":"vi","Bahasa Indonesia":"id","Kiswahili":"sw","தமிழ்":"ta","తెలుగు":"te","മലയാളം":"ml"};
+  async function runWikipediaSearch(){
+    closeOverlay("toolsOverlay");
+    const query=(promptBox.value||"").trim() || window.prompt("ما الموضوع الذي تريد البحث عنه؟");
+    if(!query || !query.trim()) return;
+    if(isGenerating){toast("انتظر انتهاء الإجابة الحالية أولاً.");return;}
+    const langName=detectResponseLanguage(query);
+    const lang=WIKI_LANGUAGE_CODES[langName]||"en";
+    const endpoint="https://"+lang+".wikipedia.org/w/api.php";
+    try{
+      toast("جارٍ البحث في ويكيبيديا باللغة "+langName+"…");
+      const searchUrl=new URL(endpoint);
+      searchUrl.search=new URLSearchParams({action:"query",list:"search",srsearch:query,srlimit:"5",format:"json",formatversion:"2",origin:"*"}).toString();
+      const searchResponse=await fetch(searchUrl.toString(),{headers:{Accept:"application/json"}});
+      if(!searchResponse.ok) throw new Error("خدمة البحث أعادت حالة "+searchResponse.status);
+      const searchData=await searchResponse.json();
+      const hits=searchData?.query?.search||[];
+      if(!hits.length) throw new Error("لم أجد نتائج في ويكيبيديا بهذه اللغة. جرّب كلمات بحث أخرى.");
+      const detailsUrl=new URL(endpoint);
+      detailsUrl.search=new URLSearchParams({action:"query",pageids:hits.map(hit=>hit.pageid).join("|"),prop:"extracts|info",exintro:"1",explaintext:"1",inprop:"url",exchars:"1300",format:"json",formatversion:"2",origin:"*"}).toString();
+      const detailsResponse=await fetch(detailsUrl.toString(),{headers:{Accept:"application/json"}});
+      if(!detailsResponse.ok) throw new Error("تعذر تحميل تفاصيل نتائج البحث.");
+      const details=await detailsResponse.json();
+      const pages=(details?.query?.pages||[]).filter(page=>!page.missing);
+      const sourceText=pages.map((page,index)=>(index+1)+". "+page.title+"\\n"+(page.extract||"لا يوجد مقتطف متاح.")+"\\nSource: "+(page.fullurl||("https://"+lang+".wikipedia.org/wiki/"+encodeURIComponent(page.title.replace(/ /g,"_"))))).join("\\n\\n").slice(0,7000);
+      if(!sourceText) throw new Error("عُثر على عناوين لكن تعذر استخراج المقتطفات.");
+      if(!currentConversation()) createConversation();
+      const conversation=currentConversation();
+      const userMessage={role:"user",text:query,createdAt:Date.now(),researchType:"wikipedia",fileName:"بحث موسوعي",referenceContext:sourceText};
+      conversation.messages.push(userMessage);
+      updateCurrentTitle(query);persist();renderConversation();renderHistory();
+      isGenerating=true;$("sendBtn").disabled=true;
+      try{await generateLocalReply(conversation);}
+      finally{isGenerating=false;$("sendBtn").disabled=false;persist();renderHistory();}
+    }catch(error){
+      toast(error?.message||"تعذر تنفيذ البحث الموسوعي. تحقق من اتصال الإنترنت.");
+    }
+  }
+  $("toolWikiSearch").addEventListener("click",runWikipediaSearch);
   $("toolImage").addEventListener("click",()=>openFilePicker("image/*"));
   $("toolPdf").addEventListener("click",()=>openFilePicker(".pdf,application/pdf"));
   $("toolSummary").addEventListener("click",()=>{closeOverlay("toolsOverlay");summarizeCurrentConversation();});
