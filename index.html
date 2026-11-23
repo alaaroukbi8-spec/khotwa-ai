@@ -594,7 +594,6 @@
     if(state === "ready"){
       $("activateAiBtn").textContent = "الذكاء الاصطناعي جاهز";
       $("activateAiBtn").classList.add("hidden");
-      try{localStorage.setItem("khotwa-ai-auto-start","1");}catch(error){}
     }
   }
   async function loadLocalAI(){
@@ -619,8 +618,7 @@
         }
       });
       aiEngine = engine;
-      appSettings.autoStart = true;
-      saveSettings();
+      if(localStorage.getItem("khotwa-ai-auto-start") === null){appSettings.autoStart = true;saveSettings();}
       setAiStatus("الذكاء الاصطناعي متصل محلياً","ready");
       $("aiLoadText").textContent = "تم تحميل النموذج. تتم معالجة الرسائل على هذا الجهاز.";
       $("aiProgressBar").style.width = "100%";
@@ -677,7 +675,7 @@
   async function generateLocalReply(conversation){
     const history = conversation.messages
       .filter(message => (message.role === "user" || message.role === "assistant") && (message.text || message.pdfExtractedText))
-      .slice(-12)
+      .slice(-(appSettings.speed === "fast" ? 6 : 12))
       .map(message => ({
         role:message.role,
         content:[
@@ -923,7 +921,7 @@
     try{await generateLocalReply(item);}
     finally{isGenerating = false;$("sendBtn").disabled = false;}
   }
-  async function summarizeCurrentConversation(){const conversation=currentConversation();if(!conversation||!conversation.messages.length){toast("Aucune conversation à résumer.");return;}if(isGenerating){toast("Attendez la fin de la réponse en cours.");return;}isGenerating=true;$("summaryBtn").disabled=true;$("sendBtn").disabled=true;let summaryMessage=null;try{const engine=await loadLocalAI();const lang=detectResponseLanguage(latestUserText(conversation));const transcript=conversation.messages.filter(m=>m.role==="user"||m.role==="assistant").map(m=>(m.role==="user"?"User: ":"Assistant: ")+(m.text||"")+(m.pdfExtractedText?"\\nDocument extract: "+m.pdfExtractedText.slice(0,5000):"")).join("\\n\\n").slice(-18000);summaryMessage={role:"assistant",text:"",createdAt:Date.now()};conversation.messages.push(summaryMessage);const row=addMessageToView(summaryMessage,conversation.messages.length-1);const bubble=row.querySelector(".bubble");bubble.textContent="Préparation du résumé…";scrollBottom();const stream=await engine.chat.completions.create({messages:[{role:"system",content:"You are KHOTWA AI. Summarize only facts in this conversation. Write a useful, structured, concise summary in "+lang+". Include the topic, key information, decisions, open questions, and next steps when present. Do not invent facts."},{role:"user",content:transcript}],stream:true,temperature:0.25,max_tokens:420});bubble.textContent="";for await(const chunk of stream){const part=chunk.choices?.[0]?.delta?.content||"";if(part){summaryMessage.text+=part;bubble.textContent=summaryMessage.text;updateScrollButton();}}if(!summaryMessage.text.trim())summaryMessage.text="The model did not produce a summary. Please try again.";bubble.textContent=summaryMessage.text;}catch(error){if(summaryMessage)conversation.messages=conversation.messages.filter(m=>m!==summaryMessage);toast(error?.message||"Impossible de créer le résumé.");}finally{conversation.updatedAt=Date.now();persist();renderHistory();renderConversation();isGenerating=false;$("summaryBtn").disabled=false;$("sendBtn").disabled=false;scrollBottom();}}
+  async function summarizeCurrentConversation(){const conversation=currentConversation();if(!conversation||!conversation.messages.length){toast("Aucune conversation à résumer.");return;}if(isGenerating){toast("Attendez la fin de la réponse en cours.");return;}isGenerating=true;$("summaryBtn").disabled=true;$("sendBtn").disabled=true;let summaryMessage=null;try{const engine=await loadLocalAI();const lang=responseLanguageFor(latestUserText(conversation));const transcript=conversation.messages.filter(m=>m.role==="user"||m.role==="assistant").map(m=>(m.role==="user"?"User: ":"Assistant: ")+(m.text||"")+(m.pdfExtractedText?"\\nDocument extract: "+m.pdfExtractedText.slice(0,5000):"")).join("\\n\\n").slice(-18000);summaryMessage={role:"assistant",text:"",createdAt:Date.now()};conversation.messages.push(summaryMessage);const row=addMessageToView(summaryMessage,conversation.messages.length-1);const bubble=row.querySelector(".bubble");bubble.textContent="Préparation du résumé…";scrollBottom();const stream=await engine.chat.completions.create({messages:[{role:"system",content:"You are KHOTWA AI. Summarize only facts in this conversation. Write a useful, structured, concise summary in "+lang+". Include the topic, key information, decisions, open questions, and next steps when present. Do not invent facts."},{role:"user",content:transcript}],stream:true,temperature:0.25,max_tokens:420});bubble.textContent="";for await(const chunk of stream){const part=chunk.choices?.[0]?.delta?.content||"";if(part){summaryMessage.text+=part;bubble.textContent=summaryMessage.text;updateScrollButton();}}if(!summaryMessage.text.trim())summaryMessage.text="The model did not produce a summary. Please try again.";bubble.textContent=summaryMessage.text;}catch(error){if(summaryMessage)conversation.messages=conversation.messages.filter(m=>m!==summaryMessage);toast(error?.message||"Impossible de créer le résumé.");}finally{conversation.updatedAt=Date.now();persist();renderHistory();renderConversation();isGenerating=false;$("summaryBtn").disabled=false;$("sendBtn").disabled=false;scrollBottom();}}
   function clearAttachment(){
     selectedFile = null;
     $("fileInput").value = "";
