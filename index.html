@@ -113,7 +113,11 @@
     .account-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
     .account-actions .google-button{font-size:11px;padding:0 7px}
     .signup-button{border-color:#b9d9d4;background:#eff8f7;color:#155e59}
-    .speech-language{height:32px;max-width:94px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#667085;font-size:11px;padding:0 5px}
+    .speech-language{height:32px;max-width:110px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#667085;font-size:11px;padding:0 5px}
+    .recording-indicator{display:none;align-items:center;gap:10px;padding:9px 12px;margin:0 2px 8px;border:1px solid #f3b8b8;border-radius:11px;background:#fff3f3;color:#a32626;font-size:12px}.recording-indicator.active{display:flex}.recording-dot{width:10px;height:10px;flex:none;background:#e43d3d;border-radius:50%;box-shadow:0 0 0 0 #e43d3d55;animation:recordPulse 1.2s infinite}.recording-stop{margin-right:auto;border:1px solid #e5a1a1;background:#fff;color:#a32626;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700}.voice-btn.recording{background:#fff0f0!important;color:#c62828!important;border:1px solid #efb1b1!important}.voice-btn.recording svg{color:#c62828}@keyframes recordPulse{0%{box-shadow:0 0 0 0 #e43d3d55}70%{box-shadow:0 0 0 8px #e43d3d00}100%{box-shadow:0 0 0 0 #e43d3d00}}
+    .message-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}.mini-btn.speak-btn{color:#147d78}.mini-btn.retry-btn{color:#a32626}
+    .bubble.thinking{color:#667085;font-style:italic}.bubble.error{background:#fff7f7;border-color:#f1c6c6;color:#9f3434}
+    body.dark .recording-indicator{background:#321c22;border-color:#6f343e;color:#ffb5bc}body.dark .recording-stop{background:#321c22;color:#ffb5bc;border-color:#7e4850}body.dark .bubble.error{background:#301d23;border-color:#75404a;color:#ffc0c5}
     .free-resources{width:min(780px,100%);margin:30px auto 5px;text-align:right}
     .free-resources h2{font-size:16px;margin:0 0 6px;color:#243247}
     .free-resources-intro{font-size:11px;color:var(--muted);line-height:1.7;margin:0 0 12px}
@@ -277,16 +281,17 @@
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5L10 18.5a2 2 0 0 1-3-3L16 6.5"/></svg><span>إرفاق ملف</span>
             </button>
             <input class="hidden" type="file" id="fileInput" accept="image/*,.pdf,.txt,.csv">
-            <button class="tool-btn" type="button" id="voiceBtn" title="الإملاء الصوتي">
+            <button class="tool-btn voice-btn" type="button" id="voiceBtn" title="الإملاء الصوتي">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5v3m-4 0h8"/></svg><span>إملاء صوتي</span>
             </button>
-            <select id="speechLang" class="speech-language" aria-label="لغة الإملاء الصوتي" title="Choisir la langue de dictée"><option value="fr-FR" selected>FR</option><option value="en-US">EN</option><option value="ar-MA">AR</option></select>
+            <select id="speechLang" class="speech-language" aria-label="لغة الإملاء الصوتي" title="Choisir la langue de dictée"><option value="fr-FR" selected>FR</option><option value="en-US">EN</option><option value="ar-MA">AR</option><option value="es-ES">ES</option><option value="de-DE">DE</option><option value="it-IT">IT</option><option value="pt-PT">PT</option><option value="tr-TR">TR</option><option value="ru-RU">RU</option><option value="ja-JP">JA</option><option value="zh-CN">ZH</option><option value="hi-IN">HI</option><option value="nl-NL">NL</option><option value="pl-PL">PL</option><option value="ko-KR">KO</option></select>
           </div>
           <button class="send-btn" id="sendBtn" type="submit" aria-label="إرسال">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
           </button>
         </div>
       </form>
+      <div class="recording-indicator" id="recordingIndicator" role="status" aria-live="polite"><span class="recording-dot"></span><span id="recordingText">جارٍ الاستماع…</span><button class="recording-stop" id="stopRecordingBtn" type="button">إيقاف التسجيل</button></div>
       <div class="disclaimer">تحليل الصور واستخراج نص PDF يتمان محلياً داخل المتصفح بعد تنزيل النماذج والمكتبات. لا تُرفع الملفات إلى خادم المحادثة. ملفات PDF المصوّرة تحتاج OCR غير متاح حالياً. لا ترسل معلومات شخصية حساسة.</div>
       <div class="chat-footer">KHOTWA AI · خطوة نحو الوصول إلى المساعدة</div>
     </div>
@@ -299,10 +304,12 @@
     <p class="account-description">اضبط لغة الردود وسرعتها وشكل التطبيق وتشغيل الذكاء الاصطناعي.</p>
     <div class="settings-grid">
       <div class="setting-row"><div><label for="settingLanguage">لغة الردود</label><small>تلقائي أو اختر لغة ثابتة.</small></div><select id="settingLanguage" class="setting-select"><option value="auto">تلقائي حسب رسالتك</option><option value="fr">Français</option><option value="en">English</option><option value="ar">العربية</option><option value="es">Español</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="pt">Português</option><option value="tr">Türkçe</option><option value="ru">Русский</option><option value="ja">日本語</option><option value="zh">中文</option><option value="hi">हिन्दी</option></select></div>
-      <div class="setting-row"><div><label for="settingSpeed">سرعة الإجابات</label><small>السريع يستخدم إجابات أقصر لتقليل وقت التوليد.</small></div><select id="settingSpeed" class="setting-select"><option value="fast">سريع</option><option value="balanced">متوازن</option><option value="detailed">مفصل</option></select></div>
+      <div class="setting-row"><div><label for="settingSpeed">سرعة الإجابات</label><small>السريع يستخدم سياقاً أقصر وإجابات أكثر اختصاراً.</small></div><select id="settingSpeed" class="setting-select"><option value="fast">سريع</option><option value="balanced">متوازن</option><option value="detailed">مفصل</option></select></div>
+      <div class="setting-row"><div><label for="settingMemory">حجم ذاكرة المحادثة</label><small>عدد الرسائل السابقة التي يحتفظ بها النموذج في سياق الرد؛ الذاكرة الأكبر أبطأ.</small></div><select id="settingMemory" class="setting-select"><option value="4">صغير · 4 رسائل</option><option value="8">متوسط · 8 رسائل</option><option value="14">كبير · 14 رسالة</option><option value="20">أقصى · 20 رسالة</option></select></div>
+      <div class="setting-row"><div><label for="settingReadAloud">قراءة الإجابات بصوت</label><small>اجعل KHOTWA AI ينطق إجاباته تلقائياً؛ يمكنك أيضاً تشغيل الصوت لكل إجابة على حدة.</small></div><input id="settingReadAloud" type="checkbox"></div>
       <div class="setting-row"><div><label for="settingTheme">المظهر</label><small>فاتح أو داكن أو حسب النظام.</small></div><select id="settingTheme" class="setting-select"><option value="light">فاتح</option><option value="dark">داكن</option><option value="system">حسب الجهاز</option></select></div>
       <div class="setting-row"><div><label for="settingAutoStart">تشغيل الذكاء الاصطناعي تلقائياً</label><small>بعد أول تحميل ناجح، سيبدأ تلقائياً عند فتح الموقع مجدداً.</small></div><input id="settingAutoStart" type="checkbox"></div>
-      <div class="setting-row"><div><label for="settingVoiceLang">لغة الإملاء الصوتي</label><small>اختر اللغة التي ستتحدث بها إلى الميكروفون.</small></div><select id="settingVoiceLang" class="setting-select"><option value="fr-FR">Français</option><option value="en-US">English</option><option value="ar-MA">العربية</option><option value="es-ES">Español</option><option value="de-DE">Deutsch</option></select></div>
+      <div class="setting-row"><div><label for="settingVoiceLang">لغة الإملاء الصوتي</label><small>اختر اللغة التي ستتحدث بها إلى الميكروفون.</small></div><select id="settingVoiceLang" class="setting-select"><option value="fr-FR">Français</option><option value="en-US">English</option><option value="ar-MA">العربية</option><option value="es-ES">Español</option><option value="de-DE">Deutsch</option><option value="it-IT">Italiano</option><option value="pt-PT">Português</option><option value="tr-TR">Türkçe</option><option value="ru-RU">Русский</option><option value="ja-JP">日本語</option><option value="zh-CN">中文</option><option value="hi-IN">हिन्दी</option><option value="nl-NL">Nederlands</option><option value="pl-PL">Polski</option><option value="ko-KR">한국어</option></select></div>
     </div>
     <button class="google-button signup-button" id="saveSettingsBtn" type="button" style="margin-top:18px">حفظ الإعدادات</button>
     <p class="account-footnote">النموذج يعمل محلياً في هذا المتصفح. بعد تنزيله أول مرة، قد تبقى ملفاته في ذاكرة التخزين المؤقت؛ عند فتح صفحة جديدة يعاد تشغيل المحرك تلقائياً إذا فعّلت هذا الخيار.</p>
@@ -400,11 +407,11 @@
   }
   const SETTINGS_KEY = "khotwa-ai-settings-v1";
   function readSettings(){
-    const defaults = {replyLanguage:"auto",speed:"fast",theme:"system",autoStart:localStorage.getItem("khotwa-ai-auto-start")==="1",voiceLanguage:"fr-FR"};
+    const defaults = {replyLanguage:"auto",speed:"fast",theme:"system",autoStart:localStorage.getItem("khotwa-ai-auto-start")==="1",voiceLanguage:"fr-FR",memory:8,readAloud:false,speechRate:1};
     try{return {...defaults,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}")};}catch(error){return defaults;}
   }
   let appSettings = readSettings();
-  const LANGUAGE_NAMES = {fr:"Français",en:"English",ar:"العربية",es:"Español",de:"Deutsch",it:"Italiano",pt:"Português",tr:"Türkçe",ru:"русский",ja:"日本語",zh:"中文",hi:"हिन्दी"};
+  const LANGUAGE_NAMES = {fr:"Français",en:"English",ar:"العربية",es:"Español",de:"Deutsch",it:"Italiano",pt:"Português",tr:"Türkçe",ru:"русский",ja:"日本語",zh:"中文",hi:"हिन्दी",nl:"Nederlands",pl:"Polski",ko:"한국어",vi:"Tiếng Việt",id:"Bahasa Indonesia",bn:"বাংলা",th:"ไทย",he:"עברית",el:"Ελληνικά",fa:"فارسی",ur:"اردو",sw:"Kiswahili"};
   function saveSettings(){
     try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(appSettings));}catch(error){}
     try{localStorage.setItem("khotwa-ai-auto-start",appSettings.autoStart?"1":"0");}catch(error){}
@@ -421,6 +428,8 @@
     $("settingAutoStart").checked=!!appSettings.autoStart;
     $("settingVoiceLang").value=appSettings.voiceLanguage;
     $("speechLang").value=appSettings.voiceLanguage;
+    $("settingMemory").value=String(appSettings.memory||8);
+    $("settingReadAloud").checked=!!appSettings.readAloud;
     applyTheme();
   }
   function responseLanguageFor(text){
@@ -428,10 +437,11 @@
     return detectResponseLanguage(text);
   }
   function generationOptions(){
-    if(appSettings.speed==="detailed") return {max_tokens:760,temperature:0.55,top_p:0.9};
-    if(appSettings.speed==="balanced") return {max_tokens:500,temperature:0.48,top_p:0.9};
-    return {max_tokens:300,temperature:0.35,top_p:0.88};
+    if(appSettings.speed==="detailed") return {max_tokens:560,temperature:0.45,top_p:0.88};
+    if(appSettings.speed==="balanced") return {max_tokens:360,temperature:0.4,top_p:0.88};
+    return {max_tokens:220,temperature:0.3,top_p:0.85};
   }
+  function memoryMessageCount(){return Math.max(4,Math.min(20,Number(appSettings.memory)||8));}
   function detectResponseLanguage(text){
     const sample = String(text || "").slice(0,2500).toLowerCase();
     if(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(sample)) return "العربية";
@@ -443,17 +453,34 @@
     const words = (sample.match(/[a-zà-ÿ]+/g) || []).join(" ");
     const score = terms => terms.reduce((sum,word)=>sum + ((" " + words + " ").includes(" " + word + " ") ? 1 : 0),0);
     const scores = [
-      ["Français",score(["je","tu","vous","nous","avec","pourquoi","comment","bonjour","merci","une","des","est","suis","veut","veux","dans","mais","parce","aussi"]) + (/[àâçéèêëîïôùûüÿœ]/.test(sample)?2:0)],
-      ["English",score(["the","and","you","what","how","please","hello","thanks","with","for","this","that","are","is","want","can","do","your"])],
-      ["Español",score(["hola","gracias","usted","quiero","puedes","para","cómo","con","una","estoy","porque"])],
-      ["Português",score(["olá","obrigado","você","quero","como","para","com","uma","não","estou","porque"])],
-      ["Deutsch",score(["hallo","danke","bitte","und","ich","du","sie","mit","nicht","möchte","was","wie"])],
-      ["Italiano",score(["ciao","grazie","perché","come","vorrei","sono","con","una","questo","posso"])],
-      ["Türkçe",score(["merhaba","teşekkür","nasıl","ben","sen","için","ile","istiyorum","lütfen"])]
+      ["Français",score(["je","tu","vous","nous","avec","pourquoi","comment","bonjour","merci","une","des","est","suis","veut","veux","dans","mais","parce","aussi","mon","ma","mes","les","pas","que","qui","quoi"]) + (/[àâçéèêëîïôùûüÿœ]/.test(sample)?2:0)],
+      ["English",score(["the","and","you","what","how","please","hello","thanks","with","for","this","that","are","is","want","can","do","your","have","will","would","could","should","my","we","they"])],
+      ["Español",score(["hola","gracias","usted","quiero","puedes","para","cómo","con","una","estoy","porque","pero","tengo","hacer","mucho"]) + (/[ñ¿¡]/.test(sample)?2:0)],
+      ["Português",score(["olá","obrigado","você","quero","como","para","com","uma","não","estou","porque","muito","também","fazer","isso","meu"]) + (/[ãõç]/.test(sample)?2:0)],
+      ["Deutsch",score(["hallo","danke","bitte","und","ich","du","sie","mit","nicht","möchte","was","wie","ist","der","die","das","ein","eine","für"]) + (/[äöüß]/.test(sample)?2:0)],
+      ["Italiano",score(["ciao","grazie","perché","come","vorrei","sono","con","una","questo","posso","che","non","anche","per","della"])],
+      ["Türkçe",score(["merhaba","teşekkür","nasıl","ben","sen","için","ile","istiyorum","lütfen","değil","çok","bir","ve","ama"]) + (/[ıİğĞşŞçÇöÖüÜ]/.test(sample)?2:0)],
+      ["Nederlands",score(["hallo","bedankt","alsjeblieft","ik","jij","wij","met","niet","wat","hoe","voor","een","het","de","zijn","mijn"])],
+      ["Polski",score(["cześć","dziękuję","proszę","jestem","chcę","jak","czy","nie","tak","oraz","bardzo","możesz"]) + (/[ąćęłńóśźż]/.test(sample)?2:0)],
+      ["Tiếng Việt",score(["xin","chào","cảm","ơn","tôi","bạn","không","và","là","một","muốn","được","như","này"]) + (/[ăâđêôơưàáảãạằắẳẵặèéẻẽẹìíỉĩịòóỏõọùúủũụỳýỷỹỵ]/.test(sample)?2:0)],
+      ["Bahasa Indonesia",score(["halo","terima","kasih","saya","kamu","anda","yang","dan","untuk","dengan","tidak","ingin","bagaimana","bisa"])],
+      ["Kiswahili",score(["habari","asante","tafadhali","ndiyo","hapana","nina","una","kwa","sana","naomba","karibu"])]
     ].sort((a,b)=>b[1]-a[1]);
     if(scores[0] && scores[0][1] > 0) return scores[0][0];
     const browser = (navigator.language || "fr").toLowerCase();
     if(browser.startsWith("ar")) return "العربية";if(browser.startsWith("en")) return "English";if(browser.startsWith("es")) return "Español";if(browser.startsWith("de")) return "Deutsch";if(browser.startsWith("it")) return "Italiano";if(browser.startsWith("pt")) return "Português";
+    if(browser.startsWith("nl")) return "Nederlands";
+    if(browser.startsWith("pl")) return "Polski";
+    if(browser.startsWith("ko")) return "한국어";
+    if(browser.startsWith("vi")) return "Tiếng Việt";
+    if(browser.startsWith("id")) return "Bahasa Indonesia";
+    if(browser.startsWith("bn")) return "বাংলা";
+    if(browser.startsWith("th")) return "ไทย";
+    if(browser.startsWith("he")) return "עברית";
+    if(browser.startsWith("el")) return "Ελληνικά";
+    if(browser.startsWith("fa")) return "فارسی";
+    if(browser.startsWith("ur")) return "اردو";
+    if(browser.startsWith("sw")) return "Kiswahili";
     return "Français";
   }
   function latestUserText(conversation){const last=[...(conversation?.messages||[])].reverse().find(message=>message.role==="user" && message.text);return last?.text || promptBox.value || "";}
@@ -509,6 +536,20 @@
     conversation.messages.forEach((message,index) => addMessageToView(message,index));
     scrollBottom();
   }
+  function speechLocaleFor(text){
+    const name=responseLanguageFor(text);
+    const map={"Français":"fr-FR","English":"en-US","العربية":"ar-MA","Español":"es-ES","Português":"pt-PT","Deutsch":"de-DE","Italiano":"it-IT","Türkçe":"tr-TR","русский":"ru-RU","日本語":"ja-JP","中文":"zh-CN","हिन्दी":"hi-IN","Nederlands":"nl-NL","Polski":"pl-PL","한국어":"ko-KR","Tiếng Việt":"vi-VN","Bahasa Indonesia":"id-ID","বাংলা":"bn-BD","ไทย":"th-TH","עברית":"he-IL","Ελληνικά":"el-GR","فارسی":"fa-IR","اردو":"ur-PK","Kiswahili":"sw-KE"};
+    return map[name]||navigator.language||"en-US";
+  }
+  function speakText(text,languageText){
+    if(!("speechSynthesis" in window)||!window.SpeechSynthesisUtterance){toast("النطق الصوتي غير متاح في هذا المتصفح.");return;}
+    const clean=String(text||"").trim();if(!clean){toast("لا توجد إجابة لقراءتها.");return;}
+    window.speechSynthesis.cancel();
+    const utterance=new SpeechSynthesisUtterance(clean.slice(0,7000));utterance.lang=speechLocaleFor(languageText||clean);utterance.rate=appSettings.speechRate||1;
+    const voices=window.speechSynthesis.getVoices();const prefix=utterance.lang.split("-")[0].toLowerCase();
+    const voice=voices.find(item=>item.lang&&item.lang.toLowerCase()===utterance.lang.toLowerCase())||voices.find(item=>item.lang&&item.lang.toLowerCase().startsWith(prefix));
+    if(voice)utterance.voice=voice;utterance.onerror=()=>toast("تعذر تشغيل الصوت. تحقق من أصوات اللغة المثبتة في جهازك.");window.speechSynthesis.speak(utterance);
+  }
   function addMessageToView(message,index){
     const row = document.createElement("article");
     row.className = "message" + (message.role === "user" ? " user" : "");
@@ -538,6 +579,13 @@
       chip.textContent = "📎 " + message.fileName + (message.imagePreviewURL ? " — صورة أُرسلت للتحليل" : (message.pdfExtractedText ? " — PDF تمت قراءة نصوصه" : " — مرفق محلياً"));
       body.appendChild(chip);
     }
+    if(message.role === "assistant"){
+      const tools=document.createElement("div");tools.className="message-tools";
+      const speak=document.createElement("button");speak.type="button";speak.className="mini-btn speak-btn";speak.textContent="🔊 استمع";speak.addEventListener("click",()=>speakText(message.text,message.text));tools.appendChild(speak);
+      const copyAnswer=document.createElement("button");copyAnswer.type="button";copyAnswer.className="mini-btn";copyAnswer.textContent="نسخ الإجابة";copyAnswer.addEventListener("click",()=>copyText(message.text||""));tools.appendChild(copyAnswer);
+      if(message.retryable){const retry=document.createElement("button");retry.type="button";retry.className="mini-btn retry-btn";retry.textContent="إعادة المحاولة";retry.addEventListener("click",()=>retryLastAnswer());tools.appendChild(retry);bubble.classList.add("error");}
+      body.appendChild(tools);
+    }
     if(message.role === "user"){
       const tools = document.createElement("div");
       tools.className = "message-tools";
@@ -552,6 +600,13 @@
     row.append(avatar,body);
     messagesEl.appendChild(row);
     return row;
+  }
+  async function retryLastAnswer(){
+    const conversation=currentConversation();if(!conversation||isGenerating)return;
+    const last=conversation.messages[conversation.messages.length-1];
+    if(last&&last.role==="assistant"&&last.retryable)conversation.messages.pop();
+    isGenerating=true;$("sendBtn").disabled=true;
+    try{await generateLocalReply(conversation);}finally{isGenerating=false;$("sendBtn").disabled=false;persist();renderConversation();}
   }
   function copyText(value){
     if(!navigator.clipboard){ toast("النسخ غير متاح في هذا المتصفح."); return; }
@@ -675,7 +730,7 @@
   async function generateLocalReply(conversation){
     const history = conversation.messages
       .filter(message => (message.role === "user" || message.role === "assistant") && (message.text || message.pdfExtractedText))
-      .slice(-(appSettings.speed === "fast" ? 6 : 12))
+      .slice(-memoryMessageCount())
       .map(message => ({
         role:message.role,
         content:[
@@ -687,7 +742,8 @@
     try{
       engine = await loadLocalAI();
     }catch(error){
-      return;
+      const failed={role:"assistant",text:"لم أتمكن من تشغيل نموذج الذكاء الاصطناعي على هذا الجهاز. "+(error?.message||"تحقق من دعم WebGPU والذاكرة المتاحة."),createdAt:Date.now(),retryable:true};
+      conversation.messages.push(failed);persist();renderConversation();renderHistory();scrollBottom();return;
     }
     const assistantMessage = {role:"assistant",text:"",createdAt:Date.now()};
     conversation.messages.push(assistantMessage);
@@ -696,6 +752,8 @@
     const bubble = row.querySelector(".bubble");
     bubble.textContent = "يفكر…";
     scrollBottom();
+    let gotFirstToken=false;
+    const thinkingTimer=window.setTimeout(()=>{if(!gotFirstToken&&bubble.isConnected)bubble.textContent="ما زال النموذج يعالج سؤالك… قد يستغرق الأمر وقتاً على الأجهزة الأبطأ."},8000);
     try{
       const responseLanguage = responseLanguageFor(latestUserText(conversation));
       const languageInstruction = AI_SYSTEM_PROMPT + " RESPONSE LANGUAGE FOR THIS TURN: " + responseLanguage + ". Reply exclusively in that language unless the user requests otherwise.";
@@ -708,17 +766,20 @@
       for await (const chunk of stream){
         const part = chunk.choices?.[0]?.delta?.content || "";
         if(part){
+          if(!gotFirstToken){gotFirstToken=true;window.clearTimeout(thinkingTimer);bubble.classList.remove("thinking");}
           assistantMessage.text += part;
           bubble.textContent = assistantMessage.text;
           updateScrollButton();
         }
       }
-      if(!assistantMessage.text.trim()) assistantMessage.text = "لم يُنتج النموذج إجابة. حاول صياغة السؤال بطريقة أخرى.";
+      if(!assistantMessage.text.trim()){assistantMessage.text = "لم يُنتج النموذج إجابة. اضغط «إعادة المحاولة» أو أعد صياغة السؤال.";assistantMessage.retryable=true;}
       bubble.textContent = assistantMessage.text;
+      if(appSettings.readAloud&&assistantMessage.text.trim())speakText(assistantMessage.text,latestUserText(conversation));
     }catch(error){
-      assistantMessage.text = "تعذر إنشاء الإجابة: " + (error?.message || "خطأ غير معروف");
-      bubble.textContent = assistantMessage.text;
+      assistantMessage.text = "تعذر إنشاء الإجابة: " + (error?.message || "خطأ غير معروف");assistantMessage.retryable=true;
+      bubble.textContent = assistantMessage.text;bubble.classList.add("error");
     }finally{
+      window.clearTimeout(thinkingTimer);
       conversation.updatedAt = Date.now();
       persist();
       renderHistory();
@@ -816,6 +877,7 @@
         assistantMessage.text = "لم يتمكن النموذج من إنتاج وصف. جرّب صورة أوضح أو سؤالاً أبسط.";
         bubble.textContent = assistantMessage.text;
       }
+      if(appSettings.readAloud&&assistantMessage.text.trim())speakText(assistantMessage.text,userPrompt||latestUserText(conversation));
     }catch(error){
       assistantMessage.text = "تعذر تحليل الصورة: " + (error?.message || "حدث خطأ غير معروف") + "\n\nجرّب صورة أصغر أو متصفحاً أحدث يدعم WebGPU/WebAssembly.";
       bubble.textContent = assistantMessage.text;
@@ -1030,6 +1092,8 @@
     appSettings.theme=$("settingTheme").value;
     appSettings.autoStart=$("settingAutoStart").checked;
     appSettings.voiceLanguage=$("settingVoiceLang").value;
+    appSettings.memory=Number($("settingMemory").value)||8;
+    appSettings.readAloud=$("settingReadAloud").checked;
     saveSettings();applySettingsToControls();closeOverlay("settingsOverlay");
     toast("تم حفظ الإعدادات.");
     if(appSettings.autoStart && !aiEngine) loadLocalAI().catch(()=>{});
@@ -1105,23 +1169,31 @@
     toast("تم حذف المحادثة الحالية من هذا المتصفح.");
   });
   $("menuBtn").addEventListener("click",() => $("sidebar").classList.toggle("open"));
-  $("voiceBtn").addEventListener("click",() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if(!SpeechRecognition){toast("الإملاء الصوتي غير مدعوم في هذا المتصفح.");return;}
-    if(recognition){recognition.stop();recognition = null;return;}
-    recognition = new SpeechRecognition();
-    recognition.lang = $("speechLang").value || "fr-FR";
-    recognition.interimResults = true;
-    recognition.onresult = event => {
-      let transcript = "";
-      for(let i=0;i<event.results.length;i++) transcript += event.results[i][0].transcript;
-      promptBox.value = transcript;
-      promptBox.dispatchEvent(new Event("input"));
+  function setRecordingState(active,message){
+    $("recordingIndicator").classList.toggle("active",active);
+    $("voiceBtn").classList.toggle("recording",active);
+    $("voiceBtn").setAttribute("aria-pressed",active?"true":"false");
+    $("voiceBtn").querySelector("span").textContent=active?"إيقاف التسجيل":"إملاء صوتي";
+    $("recordingText").textContent=message||"جارٍ الاستماع…";
+  }
+  function stopRecording(){if(recognition){try{recognition.stop();}catch(error){}}}
+  $("stopRecordingBtn").addEventListener("click",stopRecording);
+  $("voiceBtn").addEventListener("click",()=>{
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SpeechRecognition){toast("الإملاء الصوتي غير مدعوم في هذا المتصفح. جرّب أحدث إصدار من Chrome.");return;}
+    if(recognition){stopRecording();return;}
+    const activeRecognition=new SpeechRecognition();recognition=activeRecognition;
+    activeRecognition.lang=$("speechLang").value||appSettings.voiceLanguage||"fr-FR";
+    activeRecognition.interimResults=true;activeRecognition.continuous=true;
+    activeRecognition.onstart=()=>setRecordingState(true,"جارٍ الاستماع باللغة "+activeRecognition.lang+"… اضغط إيقاف عندما تنتهي.");
+    activeRecognition.onresult=event=>{
+      let transcript="";for(let i=0;i<event.results.length;i++)transcript+=event.results[i][0].transcript;
+      promptBox.value=transcript;promptBox.dispatchEvent(new Event("input"));
+      setRecordingState(true,"تم التعرف على الكلام. يمكنك مواصلة الحديث أو إيقاف التسجيل.");
     };
-    recognition.onerror = () => toast("تعذر استخدام الميكروفون.");
-    recognition.onend = () => {recognition = null;};
-    try{recognition.start();toast("Parlez maintenant — langue : " + recognition.lang);}
-    catch(error){recognition = null;toast("تعذر بدء الإملاء الصوتي.");}
+    activeRecognition.onerror=event=>{setRecordingState(false);recognition=null;toast(event.error==="not-allowed"?"يرجى السماح للمتصفح باستخدام الميكروفون.":"تعذر استخدام الميكروفون: "+event.error);};
+    activeRecognition.onend=()=>{if(recognition===activeRecognition)recognition=null;setRecordingState(false);};
+    try{activeRecognition.start();}catch(error){recognition=null;setRecordingState(false);toast("تعذر بدء الإملاء الصوتي. تحقق من إذن الميكروفون.");}
   });
   applySettingsToControls();
   renderHistory();
