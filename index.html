@@ -201,7 +201,7 @@
           </button>
         </div>
       </form>
-      <div class="disclaimer">لا ترسل كلمات مرور أو أرقام هوية أو معلومات شخصية حساسة. الملفات تبقى في هذا المتصفح ولا تُحلَّل حالياً.</div>
+      <div class="disclaimer">تحليل الصور يتم محلياً داخل المتصفح بعد تنزيل النموذج. لا تُرفع الصور إلى خادم المحادثة. تحليل PDF والمستندات غير متاح بعد. لا ترسل معلومات شخصية حساسة.</div>
       <div class="chat-footer">KHOTWA AI · خطوة نحو الوصول إلى المساعدة</div>
     </div>
   </main>
@@ -497,12 +497,16 @@
       if(availability === "unavailable"){
         throw new Error("هذا الجهاز أو المتصفح لا يستطيع تشغيل نموذج تحليل الصور محلياً.");
       }
+      let readyModel = model;
       if(availability === "downloadable"){
-        await model.createSessionWithProgress(progress=>{
+        readyModel = await model.createSessionWithProgress(progress=>{
           if(typeof onProgress === "function") onProgress(progress);
         });
       }
-      return {model,streamText:aiSdk.streamText};
+      $("aiStatusText").textContent = "نموذج تحليل الصور جاهز";
+      $("aiStatusDot").style.background = "#16a34a";
+      $("aiStateBtn").classList.add("ready");
+      return {model:readyModel,streamText:aiSdk.streamText};
     })().then(value=>{
       visionModel=value;
       return value;
