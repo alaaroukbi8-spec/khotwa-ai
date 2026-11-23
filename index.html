@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101b2d">
+  <meta name="theme-color" content="#f0f2f1">
   <meta name="description" content="KHOTWA AI — مساحة مساعدة رقمية لفهم الخدمات والإجراءات والفرص في المغرب.">
   <title>KHOTWA AI — خطوة</title>
   <style>
     :root{
       color-scheme:light;
-      --sidebar:#101b2d;--sidebar-soft:#1a2940;--main:#f7f8fa;--panel:#fff;
-      --ink:#1d2939;--muted:#667085;--soft:#98a2b3;--line:#e6e9ef;
+      --sidebar:#263748;--sidebar-soft:#33485b;--main:#f0f2f1;--panel:#fff;
+      --ink:#182733;--muted:#5e6c72;--soft:#8d9a9d;--line:#dfe5e2;
       --accent:#147d78;--accent-dark:#0f6662;--accent-soft:#e7f4f2;
       --shadow:0 12px 32px rgba(16,24,40,.07);--radius:18px;
     }
@@ -40,20 +40,19 @@
     .status-dot{width:8px;height:8px;border-radius:50%;background:#d39b45;box-shadow:0 0 0 4px #d39b4520;flex:none}
     .status-copy{font-size:11px;line-height:1.6;color:#aab6c8}
     .main{min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;background:var(--main);position:relative}
-    .topbar{height:64px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--line);background:#ffffffd9;backdrop-filter:blur(12px)}
+    .topbar{height:64px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--line);background:#fff;backdrop-filter:blur(12px)}
     .top-left{display:flex;align-items:center;gap:12px}
     .page-name{font-size:14px;font-weight:750;letter-spacing:.3px;direction:ltr}
     .engine-state{display:flex;align-items:center;gap:7px;border:1px solid #f0dfc2;background:#fffaf1;color:#8b5e20;border-radius:999px;padding:6px 10px;font-size:11px}
     .engine-state .status-dot{width:6px;height:6px;box-shadow:none}
-    .engine-state{font:inherit;cursor:pointer}.engine-state:hover{filter:brightness(.98)}.engine-state:disabled{opacity:.8;cursor:wait}
-    .engine-state.ready{border-color:#b8e2d0;background:#effaf4;color:#166534}.engine-state.ready .status-dot{background:#16a34a}
-    .activate-ai{margin:20px auto 0;padding:12px 20px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;box-shadow:0 7px 20px #147d7825}.activate-ai:hover{background:var(--accent-dark)}.activate-ai:disabled{opacity:.55;cursor:wait}
+    .engine-state{font:inherit;cursor:default;user-select:none}
+    .engine-state.ready{border-color:#b8e2d0;background:#effaf4;color:#166534}.engine-state.ready .status-dot{background:#16a34a}.engine-state.error{border-color:#efcaca;background:#fff4f4;color:#a32929}.engine-state.error .status-dot{background:#d14343}
     .ai-load-info{width:min(420px,100%);margin:13px auto 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--muted);font-size:11px;text-align:right}.model-progress{height:6px;border-radius:99px;background:#e9edf2;overflow:hidden;margin-top:8px}.model-progress div{height:100%;width:0;background:var(--accent);transition:width .2s}
     .top-actions{display:flex;align-items:center;gap:7px}
     .icon-btn{width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#536174;display:grid;place-items:center}
     .icon-btn:hover{background:#f1f4f7;border-color:#cbd3df}
     .mobile-menu{display:none}
-    .content{flex:1 1 auto;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#b8c2cf transparent;padding:26px 22px 12px}
+    .content{flex:1 1 auto;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#aebbb7 transparent;padding:26px 22px 12px;background:#f0f2f1}
     .chat-wrap{width:min(860px,100%);margin:0 auto;min-height:100%;display:flex;flex-direction:column}
     .welcome{padding:8vh 12px 30px;text-align:center}
     .welcome-kicker{font-size:11px;font-weight:750;letter-spacing:1.4px;color:var(--accent);direction:ltr}
@@ -233,7 +232,7 @@
         <button class="account-btn utility-btn" id="summaryBtn" type="button" title="تلخيص المحادثة">Résumé</button>
         <button class="account-btn utility-btn" id="shareBtn" type="button" title="إنشاء رابط عام لهذه المحادثة">Lien public</button>
         <button class="account-btn" id="accountBtn" type="button">الحساب</button>
-        <button class="engine-state" id="aiStateBtn" type="button" title="تشغيل نموذج ذكاء اصطناعي محلي على هذا الجهاز"><span class="status-dot" id="aiStatusDot"></span><span id="aiStatusText">تشغيل الذكاء الاصطناعي المحلي</span></button>
+        <div class="engine-state" id="aiStateBtn" role="status" aria-live="polite" title="حالة محرك الذكاء الاصطناعي"><span class="status-dot" id="aiStatusDot"></span><span id="aiStatusText">جارٍ تجهيز الذكاء الاصطناعي تلقائياً…</span></div>
         <button class="icon-btn" id="clearBtn" type="button" title="حذف المحادثة الحالية" aria-label="حذف المحادثة الحالية">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
         </button>
@@ -245,7 +244,7 @@
         <section class="welcome" id="welcome">
           <div class="welcome-kicker">KHOTWA AI</div>
           <h1>كيف أستطيع مساعدتك اليوم؟</h1>
-          <p>مساعد رقمي يعمل بنموذج لغوي محلي. ابدأ بكتابة رسالتك؛ وبعد أول تحميل ناجح سيعمل النموذج تلقائياً في زياراتك القادمة.</p><button class="activate-ai" id="activateAiBtn" type="button">تشغيل الذكاء الاصطناعي على هذا الجهاز</button><div class="ai-load-info hidden" id="aiLoadInfo" aria-live="polite"><span id="aiLoadText">تهيئة النموذج…</span><div class="model-progress"><div id="aiProgressBar"></div></div></div>
+          <p>مساعدك الذكي جاهز تلقائياً. اكتب رسالتك مباشرة؛ يتم تجهيز محرك الذكاء الاصطناعي عند فتح التطبيق.</p><div class="ai-load-info" id="aiLoadInfo" aria-live="polite"><span id="aiLoadText">تهيئة النموذج…</span><div class="model-progress"><div id="aiProgressBar"></div></div></div>
           <div class="suggestions">
             <button class="suggestion" type="button" data-prompt="أريد فهم إجراء إداري في المغرب."><span class="suggestion-icon">▤</span><span><strong>فهم الإجراءات الإدارية</strong><small>تبسيط الخطوات والوثائق المطلوبة.</small></span></button>
             <button class="suggestion" type="button" data-prompt="أبحث عن فرص التكوين والتدريب في المغرب."><span class="suggestion-icon">▦</span><span><strong>التكوين والفرص المهنية</strong><small>التعرّف على مسارات التدريب والعمل.</small></span></button>
@@ -308,7 +307,6 @@
       <div class="setting-row"><div><label for="settingMemory">حجم ذاكرة المحادثة</label><small>عدد الرسائل السابقة التي يحتفظ بها النموذج في سياق الرد؛ الذاكرة الأكبر أبطأ.</small></div><select id="settingMemory" class="setting-select"><option value="4">صغير · 4 رسائل</option><option value="8">متوسط · 8 رسائل</option><option value="14">كبير · 14 رسالة</option><option value="20">أقصى · 20 رسالة</option></select></div>
       <div class="setting-row"><div><label for="settingReadAloud">قراءة الإجابات بصوت</label><small>اجعل KHOTWA AI ينطق إجاباته تلقائياً؛ يمكنك أيضاً تشغيل الصوت لكل إجابة على حدة.</small></div><input id="settingReadAloud" type="checkbox"></div>
       <div class="setting-row"><div><label for="settingTheme">المظهر</label><small>فاتح أو داكن أو حسب النظام.</small></div><select id="settingTheme" class="setting-select"><option value="light">فاتح</option><option value="dark">داكن</option><option value="system">حسب الجهاز</option></select></div>
-      <div class="setting-row"><div><label for="settingAutoStart">تشغيل الذكاء الاصطناعي تلقائياً</label><small>بعد أول تحميل ناجح، سيبدأ تلقائياً عند فتح الموقع مجدداً.</small></div><input id="settingAutoStart" type="checkbox"></div>
       <div class="setting-row"><div><label for="settingVoiceLang">لغة الإملاء الصوتي</label><small>اختر اللغة التي ستتحدث بها إلى الميكروفون.</small></div><select id="settingVoiceLang" class="setting-select"><option value="fr-FR">Français</option><option value="en-US">English</option><option value="ar-MA">العربية</option><option value="es-ES">Español</option><option value="de-DE">Deutsch</option><option value="it-IT">Italiano</option><option value="pt-PT">Português</option><option value="tr-TR">Türkçe</option><option value="ru-RU">Русский</option><option value="ja-JP">日本語</option><option value="zh-CN">中文</option><option value="hi-IN">हिन्दी</option><option value="nl-NL">Nederlands</option><option value="pl-PL">Polski</option><option value="ko-KR">한국어</option><option value="vi-VN">Tiếng Việt</option><option value="id-ID">Bahasa Indonesia</option><option value="bn-BD">বাংলা</option><option value="th-TH">ไทย</option><option value="he-IL">עברית</option><option value="el-GR">Ελληνικά</option><option value="fa-IR">فارسی</option><option value="ur-PK">اردو</option><option value="sw-KE">Kiswahili</option></select></div>
     </div>
     <button class="google-button signup-button" id="saveSettingsBtn" type="button" style="margin-top:18px">حفظ الإعدادات</button>
@@ -407,25 +405,24 @@
   }
   const SETTINGS_KEY = "khotwa-ai-settings-v1";
   function readSettings(){
-    const defaults = {replyLanguage:"auto",speed:"fast",theme:"system",autoStart:localStorage.getItem("khotwa-ai-auto-start")==="1",voiceLanguage:"fr-FR",memory:4,readAloud:false,speechRate:1};
+    const defaults = {replyLanguage:"auto",speed:"fast",theme:"light",voiceLanguage:"fr-FR",memory:4,readAloud:false,speechRate:1};
     try{return {...defaults,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}")};}catch(error){return defaults;}
   }
   let appSettings = readSettings();
+  if(appSettings.theme==="system"){appSettings.theme="light";try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(appSettings));}catch(error){}}
   const LANGUAGE_NAMES = {fr:"Français",en:"English",ar:"العربية",es:"Español",de:"Deutsch",it:"Italiano",pt:"Português",tr:"Türkçe",ru:"русский",ja:"日本語",zh:"中文",hi:"हिन्दी",nl:"Nederlands",pl:"Polski",ko:"한국어",vi:"Tiếng Việt",id:"Bahasa Indonesia",bn:"বাংলা",th:"ไทย",he:"עברית",el:"Ελληνικά",fa:"فارسی",ur:"اردو",sw:"Kiswahili",ta:"தமிழ்",te:"తెలుగు",ml:"മലയാളം"};
   function saveSettings(){
     try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(appSettings));}catch(error){}
-    try{localStorage.setItem("khotwa-ai-auto-start",appSettings.autoStart?"1":"0");}catch(error){}
   }
   function applyTheme(){
-    const theme=appSettings.theme||"system";
-    const dark=theme==="dark" || (theme==="system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const theme=appSettings.theme||"light";
+    const dark=theme==="dark";
     document.body.classList.toggle("dark",dark);
   }
   function applySettingsToControls(){
     $("settingLanguage").value=appSettings.replyLanguage;
     $("settingSpeed").value=appSettings.speed;
     $("settingTheme").value=appSettings.theme;
-    $("settingAutoStart").checked=!!appSettings.autoStart;
     $("settingVoiceLang").value=appSettings.voiceLanguage;
     $("speechLang").value=appSettings.voiceLanguage;
     $("settingMemory").value=String(appSettings.memory||4);
@@ -656,14 +653,9 @@
   }
   function setAiStatus(label,state="idle"){
     $("aiStatusText").textContent = label;
-    $("aiStatusDot").style.background = state === "ready" ? "#16a34a" : "#d39b45";
+    $("aiStatusDot").style.background = state === "ready" ? "#15945a" : (state === "error" ? "#d14343" : "#c18b35");
     $("aiStateBtn").classList.toggle("ready",state === "ready");
-    $("aiStateBtn").disabled = state === "loading";
-    $("activateAiBtn").disabled = state === "loading" || state === "ready";
-    if(state === "ready"){
-      $("activateAiBtn").textContent = "الذكاء الاصطناعي جاهز";
-      $("activateAiBtn").classList.add("hidden");
-    }
+    $("aiStateBtn").classList.toggle("error",state === "error");
   }
   async function loadLocalAI(){
     if(aiEngine) return aiEngine;
@@ -687,7 +679,6 @@
         }
       });
       aiEngine = engine;
-      if(localStorage.getItem("khotwa-ai-auto-start") === null){appSettings.autoStart = true;saveSettings();}
       setAiStatus("الذكاء الاصطناعي متصل محلياً","ready");
       $("aiLoadText").textContent = "تم تحميل النموذج. تتم معالجة الرسائل على هذا الجهاز.";
       $("aiProgressBar").style.width = "100%";
@@ -1104,7 +1095,6 @@
     appSettings.replyLanguage=$("settingLanguage").value;
     appSettings.speed=$("settingSpeed").value;
     appSettings.theme=$("settingTheme").value;
-    appSettings.autoStart=$("settingAutoStart").checked;
     appSettings.voiceLanguage=$("settingVoiceLang").value;
     appSettings.memory=Number($("settingMemory").value)||8;
     appSettings.readAloud=$("settingReadAloud").checked;
@@ -1141,8 +1131,6 @@
   else updateAccountState(null);
   $("summaryBtn").addEventListener("click",summarizeCurrentConversation);
   $("shareBtn").addEventListener("click",shareCurrentConversation);
-  $("aiStateBtn").addEventListener("click",()=>loadLocalAI().catch(()=>{}));
-  $("activateAiBtn").addEventListener("click",()=>loadLocalAI().catch(()=>{}));
   $("newChat").addEventListener("click",createConversation);
   $("historySearch").addEventListener("input",renderHistory);
   $("chatForm").addEventListener("submit",event => {event.preventDefault();sendMessage();});
@@ -1212,12 +1200,12 @@
   applySettingsToControls();
   renderHistory();
   renderConversation();
-  if(appSettings.autoStart){
-    $("activateAiBtn").classList.add("hidden");
+  $("aiLoadInfo").classList.remove("hidden");
+  $("aiLoadText").textContent="جارٍ تشغيل الذكاء الاصطناعي تلقائياً…";
+  loadLocalAI().catch(error=>{
     $("aiLoadInfo").classList.remove("hidden");
-    $("aiLoadText").textContent="إعادة تشغيل النموذج المحفوظ…";
-    loadLocalAI().catch(()=>{});
-  }
+    $("aiLoadText").textContent="تعذّر التشغيل التلقائي: "+(error?.message||"تحقق من توافق المتصفح والجهاز.");
+  });
 })();
 </script>
 </body>
