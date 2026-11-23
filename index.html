@@ -191,7 +191,7 @@
             <button class="tool-btn" type="button" id="attachBtn" title="إرفاق صورة أو مستند">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5 12.5 20a5 5 0 0 1-7-7L14 4.5a3.5 3.5 0 0 1 5 5L10 18.5a2 2 0 0 1-3-3L16 6.5"/></svg><span>إرفاق ملف</span>
             </button>
-            <input class="hidden" type="file" id="fileInput" accept="image/*,.pdf,.txt,.doc,.docx,.csv">
+            <input class="hidden" type="file" id="fileInput" accept="image/*,.pdf,.txt,.csv">
             <button class="tool-btn" type="button" id="voiceBtn" title="الإملاء الصوتي">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5v3m-4 0h8"/></svg><span>إملاء صوتي</span>
             </button>
@@ -201,7 +201,7 @@
           </button>
         </div>
       </form>
-      <div class="disclaimer">تحليل الصور يتم محلياً داخل المتصفح بعد تنزيل النموذج. لا تُرفع الصور إلى خادم المحادثة. تحليل PDF والمستندات غير متاح بعد. لا ترسل معلومات شخصية حساسة.</div>
+      <div class="disclaimer">تحليل الصور واستخراج نص PDF يتمان محلياً داخل المتصفح بعد تنزيل النماذج والمكتبات. لا تُرفع الملفات إلى خادم المحادثة. ملفات PDF المصوّرة تحتاج OCR غير متاح حالياً. لا ترسل معلومات شخصية حساسة.</div>
       <div class="chat-footer">KHOTWA AI · خطوة نحو الوصول إلى المساعدة</div>
     </div>
   </main>
@@ -339,7 +339,7 @@
     if(message.fileName){
       const chip = document.createElement("div");
       chip.className = "attachment-chip";
-      chip.textContent = "📎 " + message.fileName + (message.imagePreviewURL ? " — صورة أُرسلت للتحليل" : " — مرفق محلياً");
+      chip.textContent = "📎 " + message.fileName + (message.imagePreviewURL ? " — صورة أُرسلت للتحليل" : (message.pdfExtractedText ? " — PDF تمت قراءة نصوصه" : " — مرفق محلياً"));
       body.appendChild(chip);
     }
     if(message.role === "user"){
@@ -429,11 +429,55 @@
     });
     return aiEnginePromise;
   }
+  let pdfjsPromise = null;
+  async function extractPdfText(file){
+    if(file.size > 12 * 1024 * 1024){
+      throw new Error("حجم ملف PDF يتجاوز 12 ميغابايت. اختر نسخة أصغر.");
+    }
+    if(!pdfjsPromise){
+      pdfjsPromise = import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs")
+        .then(pdfjs => {
+          pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+          return pdfjs;
+        })
+        .catch(error => {
+          pdfjsPromise = null;
+          throw new Error("تعذر تحميل قارئ PDF. تحقق من اتصال الإنترنت ثم أعد المحاولة.");
+        });
+    }
+    const pdfjs = await pdfjsPromise;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const pdf = await pdfjs.getDocument({data:bytes}).promise;
+    const pageLimit = Math.min(pdf.numPages,30);
+    let extracted = "";
+    for(let pageNumber=1; pageNumber<=pageLimit; pageNumber++){
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .filter(item => typeof item.str === "string")
+        .map(item => item.str)
+        .join(" ")
+        .replace(/\\s+/g," ")
+        .trim();
+      if(pageText) extracted += "\\n[الصفحة " + pageNumber + "]\\n" + pageText;
+      if(extracted.length >= 10000){
+        extracted = extracted.slice(0,10000);
+        break;
+      }
+    }
+    return {text:extracted.trim(),pages:pdf.numPages,processedPages:pageLimit};
+  }
   async function generateLocalReply(conversation){
     const history = conversation.messages
-      .filter(message => (message.role === "user" || message.role === "assistant") && !message.fileName && message.text)
+      .filter(message => (message.role === "user" || message.role === "assistant") && (message.text || message.pdfExtractedText))
       .slice(-12)
-      .map(message => ({role:message.role,content:message.text}));
+      .map(message => ({
+        role:message.role,
+        content:[
+          message.text || (message.pdfExtractedText ? "حلّل ملف PDF المرفق وأجب عن الأسئلة التالية." : ""),
+          message.pdfExtractedText ? "\\n\\nنص مستخرج من ملف PDF (مقتطف محلي):\\n" + message.pdfExtractedText : ""
+        ].join("")
+      }));
     let engine;
     try{
       engine = await loadLocalAI();
@@ -607,10 +651,62 @@
       finally{ isGenerating = false; $("sendBtn").disabled = false; }
       return;
     }
+    if(attachedFile && (attachedFile.type === "application/pdf" || attachedFile.name.toLowerCase().endsWith(".pdf"))){
+      isGenerating = true;
+      $("sendBtn").disabled = true;
+      const info = document.createElement("div");
+      info.className = "notice";
+      info.textContent = "جارٍ استخراج النص من صفحات PDF محلياً…";
+      messagesEl.appendChild(info);
+      scrollBottom();
+      try{
+        const result = await extractPdfText(attachedFile);
+        if(!result.text){
+          info.textContent = "لم أجد نصاً قابلاً للاستخراج في هذا الملف. قد يكون PDF عبارة عن صفحات مصوّرة؛ قراءة هذا النوع تحتاج OCR، وهي غير مفعّلة بعد.";
+          return;
+        }
+        const userMessage = item.messages[item.messages.length-1];
+        userMessage.pdfExtractedText = result.text;
+        userMessage.pdfPageCount = result.pages;
+        userMessage.pdfProcessedPages = result.processedPages;
+        if(!userMessage.text){
+          userMessage.text = "لخّص ملف PDF المرفق، واشرح أهم الأفكار والنقاط المهمة.";
+        }
+        persist();
+        info.textContent = "تم استخراج النص من " + result.processedPages + " صفحة من أصل " + result.pages + ". جارٍ إرسال المقتطف إلى نموذج KHOTWA AI المحلي…";
+        await generateLocalReply(item);
+      }catch(error){
+        info.textContent = "تعذرت قراءة PDF: " + (error?.message || "خطأ غير معروف");
+      }finally{
+        isGenerating = false;
+        $("sendBtn").disabled = false;
+        scrollBottom();
+      }
+      return;
+    }
+    if(attachedFile && (attachedFile.type === "text/plain" || attachedFile.type === "text/csv" || /\\.(txt|csv)$/i.test(attachedFile.name))){
+      isGenerating = true;
+      $("sendBtn").disabled = true;
+      try{
+        if(attachedFile.size > 200000) throw new Error("الملف النصي أكبر من 200 كيلوبايت.");
+        const rawText = (await attachedFile.text()).slice(0,10000);
+        const userMessage = item.messages[item.messages.length-1];
+        userMessage.pdfExtractedText = rawText;
+        if(!userMessage.text) userMessage.text = "لخّص الملف النصي المرفق.";
+        persist();
+        await generateLocalReply(item);
+      }catch(error){
+        toast(error?.message || "تعذرت قراءة الملف النصي.");
+      }finally{
+        isGenerating = false;
+        $("sendBtn").disabled = false;
+      }
+      return;
+    }
     if(attachedFile){
       const info = document.createElement("div");
       info.className = "notice";
-      info.textContent = "تم إرفاق الملف وحفظ اسمه، لكن تحليل PDF والمستندات غير مفعّل بعد. أرسل صورة بصيغة PNG أو JPG أو WEBP لتحليلها.";
+      info.textContent = "يمكن حالياً تحليل صور JPG وPNG وWEBP، وقراءة النص من PDF وTXT وCSV. ملفات Word غير مدعومة بعد.";
       messagesEl.appendChild(info);
       scrollBottom();
       return;
