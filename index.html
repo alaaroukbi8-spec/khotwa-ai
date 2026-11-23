@@ -45,6 +45,10 @@
     .page-name{font-size:14px;font-weight:750;letter-spacing:.3px;direction:ltr}
     .engine-state{display:flex;align-items:center;gap:7px;border:1px solid #f0dfc2;background:#fffaf1;color:#8b5e20;border-radius:999px;padding:6px 10px;font-size:11px}
     .engine-state .status-dot{width:6px;height:6px;box-shadow:none}
+    .engine-state{font:inherit;cursor:pointer}.engine-state:hover{filter:brightness(.98)}.engine-state:disabled{opacity:.8;cursor:wait}
+    .engine-state.ready{border-color:#b8e2d0;background:#effaf4;color:#166534}.engine-state.ready .status-dot{background:#16a34a}
+    .activate-ai{margin:20px auto 0;padding:12px 20px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;box-shadow:0 7px 20px #147d7825}.activate-ai:hover{background:var(--accent-dark)}.activate-ai:disabled{opacity:.55;cursor:wait}
+    .ai-load-info{width:min(420px,100%);margin:13px auto 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--muted);font-size:11px;text-align:right}.model-progress{height:6px;border-radius:99px;background:#e9edf2;overflow:hidden;margin-top:8px}.model-progress div{height:100%;width:0;background:var(--accent);transition:width .2s}
     .top-actions{display:flex;align-items:center;gap:7px}
     .icon-btn{width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#536174;display:grid;place-items:center}
     .icon-btn:hover{background:#f1f4f7;border-color:#cbd3df}
@@ -149,7 +153,7 @@
         <div class="page-name">KHOTWA AI</div>
       </div>
       <div class="top-actions">
-        <div class="engine-state"><span class="status-dot"></span><span>محرك الذكاء الاصطناعي غير متصل</span></div>
+        <button class="engine-state" id="aiStateBtn" type="button" title="تشغيل نموذج ذكاء اصطناعي محلي على هذا الجهاز"><span class="status-dot" id="aiStatusDot"></span><span id="aiStatusText">تشغيل الذكاء الاصطناعي المحلي</span></button>
         <button class="icon-btn" id="clearBtn" type="button" title="حذف المحادثة الحالية" aria-label="حذف المحادثة الحالية">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
         </button>
@@ -161,7 +165,7 @@
         <section class="welcome" id="welcome">
           <div class="welcome-kicker">KHOTWA AI</div>
           <h1>كيف أستطيع مساعدتك اليوم؟</h1>
-          <p>مساحة رقمية لمساعدتك على فهم الإجراءات والخدمات والفرص. اكتب سؤالك وابدأ محادثة جديدة.</p>
+          <p>مساعد رقمي يعمل بنموذج لغوي محلي على جهازك. شغّل النموذج أولاً؛ سيُحمَّل عند أول استخدام ويُحفظ في المتصفح.</p><button class="activate-ai" id="activateAiBtn" type="button">تشغيل الذكاء الاصطناعي على هذا الجهاز</button><div class="ai-load-info hidden" id="aiLoadInfo" aria-live="polite"><span id="aiLoadText">تهيئة النموذج…</span><div class="model-progress"><div id="aiProgressBar"></div></div></div>
           <div class="suggestions">
             <button class="suggestion" type="button" data-prompt="أريد فهم إجراء إداري في المغرب."><span class="suggestion-icon">▤</span><span><strong>فهم الإجراءات الإدارية</strong><small>تبسيط الخطوات والوثائق المطلوبة.</small></span></button>
             <button class="suggestion" type="button" data-prompt="أبحث عن فرص التكوين والتدريب في المغرب."><span class="suggestion-icon">▦</span><span><strong>التكوين والفرص المهنية</strong><small>التعرّف على مسارات التدريب والعمل.</small></span></button>
@@ -215,6 +219,20 @@
   let currentId = null;
   let selectedFile = null;
   let recognition = null;
+  let aiEngine = null;
+  let aiEnginePromise = null;
+  let isGenerating = false;
+  const LOCAL_MODEL_ID = "Qwen3-0.6B-q4f16_1-MLC";
+  const AI_SYSTEM_PROMPT = [
+    "You are KHOTWA AI, an independent, helpful, age-appropriate assistant.",
+    "Respond in the same language as the user: Arabic, French, or English.",
+    "Be clear, useful, honest, and concise. Ask one short clarifying question only when needed.",
+    "For Moroccan administrative, social, education, and work topics, explain general steps and say when details must be checked with an official source.",
+    "Never invent official phone numbers, addresses, laws, prices, citations, or live availability. Say when uncertain.",
+    "Do not ask for passwords, identity numbers, payment information, or other sensitive personal data.",
+    "Do not provide instructions that facilitate violence, self-harm, dangerous substances, illegal actions, or age-restricted goods.",
+    "You are KHOTWA AI, not ChatGPT."
+  ].join(" ");
 
   function loadConversations(){
     try{
@@ -319,6 +337,7 @@
     }
     row.append(avatar,body);
     messagesEl.appendChild(row);
+    return row;
   }
   function copyText(value){
     if(!navigator.clipboard){ toast("النسخ غير متاح في هذا المتصفح."); return; }
@@ -347,26 +366,126 @@
     }
     item.updatedAt = Date.now();
   }
-  function sendMessage(){
+  function setAiStatus(label,state="idle"){
+    $("aiStatusText").textContent = label;
+    $("aiStatusDot").style.background = state === "ready" ? "#16a34a" : "#d39b45";
+    $("aiStateBtn").classList.toggle("ready",state === "ready");
+    $("aiStateBtn").disabled = state === "loading";
+    $("activateAiBtn").disabled = state === "loading" || state === "ready";
+    if(state === "ready") $("activateAiBtn").textContent = "الذكاء الاصطناعي جاهز";
+  }
+  async function loadLocalAI(){
+    if(aiEngine) return aiEngine;
+    if(aiEnginePromise) return aiEnginePromise;
+    aiEnginePromise = (async () => {
+      if(!window.isSecureContext) throw new Error("افتح التطبيق من رابط HTTPS لتشغيل النموذج المحلي.");
+      if(!navigator.gpu) throw new Error("هذا المتصفح أو الجهاز لا يدعم WebGPU. استخدم إصداراً حديثاً من Chrome وجهازاً متوافقاً.");
+      const adapter = await navigator.gpu.requestAdapter();
+      if(!adapter) throw new Error("لم يتم العثور على معالج رسومي يدعم WebGPU في هذا الجهاز.");
+      setAiStatus("جارٍ تجهيز النموذج…","loading");
+      $("aiLoadInfo").classList.remove("hidden");
+      $("aiLoadText").textContent = "جارٍ تحميل مكتبة النموذج… قد يستغرق التنزيل الأول وقتاً ويستهلك بيانات إنترنت.";
+      $("aiProgressBar").style.width = "0%";
+      const webllm = await import("https://esm.run/@mlc-ai/web-llm");
+      const engine = await webllm.CreateMLCEngine(LOCAL_MODEL_ID,{
+        initProgressCallback:(progress)=>{
+          const amount = Number.isFinite(progress?.progress) ? Math.max(0,Math.min(100,progress.progress*100)) : 0;
+          $("aiProgressBar").style.width = amount.toFixed(0) + "%";
+          $("aiLoadText").textContent = progress?.text || ("جارٍ تنزيل النموذج… " + amount.toFixed(0) + "%");
+          setAiStatus(amount ? "جارٍ تنزيل النموذج " + amount.toFixed(0) + "%" : "جارٍ تحميل النموذج…","loading");
+        }
+      });
+      aiEngine = engine;
+      setAiStatus("الذكاء الاصطناعي متصل محلياً","ready");
+      $("aiLoadText").textContent = "تم تحميل النموذج. تتم معالجة الرسائل على هذا الجهاز.";
+      $("aiProgressBar").style.width = "100%";
+      toast("أصبح KHOTWA AI جاهزاً للإجابة محلياً.");
+      return engine;
+    })().catch(error=>{
+      aiEnginePromise = null;
+      setAiStatus("تعذر تشغيل النموذج","error");
+      $("aiLoadInfo").classList.remove("hidden");
+      $("aiLoadText").textContent = error?.message || "حدث خطأ أثناء تشغيل النموذج.";
+      toast(error?.message || "تعذر تحميل نموذج الذكاء الاصطناعي.");
+      throw error;
+    });
+    return aiEnginePromise;
+  }
+  async function generateLocalReply(conversation){
+    const history = conversation.messages
+      .filter(message => (message.role === "user" || message.role === "assistant") && !message.fileName && message.text)
+      .slice(-12)
+      .map(message => ({role:message.role,content:message.text}));
+    let engine;
+    try{
+      engine = await loadLocalAI();
+    }catch(error){
+      return;
+    }
+    const assistantMessage = {role:"assistant",text:"",createdAt:Date.now()};
+    conversation.messages.push(assistantMessage);
+    persist();
+    const row = addMessageToView(assistantMessage,conversation.messages.length-1);
+    const bubble = row.querySelector(".bubble");
+    bubble.textContent = "يفكر…";
+    scrollBottom();
+    try{
+      const stream = await engine.chat.completions.create({
+        messages:[{role:"system",content:AI_SYSTEM_PROMPT},...history],
+        stream:true,
+        temperature:0.65,
+        top_p:0.9,
+        max_tokens:600
+      });
+      bubble.textContent = "";
+      for await (const chunk of stream){
+        const part = chunk.choices?.[0]?.delta?.content || "";
+        if(part){
+          assistantMessage.text += part;
+          bubble.textContent = assistantMessage.text;
+          updateScrollButton();
+        }
+      }
+      if(!assistantMessage.text.trim()) assistantMessage.text = "لم يُنتج النموذج إجابة. حاول صياغة السؤال بطريقة أخرى.";
+      bubble.textContent = assistantMessage.text;
+    }catch(error){
+      assistantMessage.text = "تعذر إنشاء الإجابة: " + (error?.message || "خطأ غير معروف");
+      bubble.textContent = assistantMessage.text;
+    }finally{
+      conversation.updatedAt = Date.now();
+      persist();
+      renderHistory();
+      scrollBottom();
+    }
+  }
+  async function sendMessage(){
     const text = promptBox.value.trim();
-    if(!text && !selectedFile){ toast("اكتب رسالة أو أرفق ملفاً أولاً."); return; }
+    if(isGenerating){toast("انتظر انتهاء الإجابة الحالية أولاً.");return;}
+    if(!text && !selectedFile){toast("اكتب رسالة أو أرفق ملفاً أولاً.");return;}
     if(!currentConversation()) createConversation();
     const item = currentConversation();
-    const message = {role:"user",text,createdAt:Date.now(),fileName:selectedFile ? selectedFile.name : ""};
+    const hasAttachment = !!selectedFile;
+    const message = {role:"user",text,createdAt:Date.now(),fileName:hasAttachment ? selectedFile.name : ""};
     item.messages.push(message);
-    updateCurrentTitle(text || selectedFile.name);
+    updateCurrentTitle(text || (selectedFile ? selectedFile.name : "محادثة جديدة"));
     persist();
     clearAttachment();
     promptBox.value = "";
     promptBox.style.height = "auto";
     renderConversation();
     renderHistory();
-    const info = document.createElement("div");
-    info.className = "notice";
-    info.textContent = "تم حفظ رسالتك في سجل هذا المتصفح. لم يتم إرسالها إلى نموذج ذكاء اصطناعي، لأن محرك KHOTWA AI لم يُربط بعد. لن نعرض إجابة آلية وهمية.";
-    messagesEl.appendChild(info);
-    scrollBottom();
-    toast("حُفظت الرسالة محلياً؛ الذكاء الاصطناعي غير متصل بعد.");
+    if(hasAttachment){
+      const info = document.createElement("div");
+      info.className = "notice";
+      info.textContent = "تم إرفاق الملف وحفظه في المحادثة، لكن تحليل الصور والملفات غير مفعّل بعد. لم يقرأ النموذج محتوى الملف.";
+      messagesEl.appendChild(info);
+      scrollBottom();
+      return;
+    }
+    isGenerating = true;
+    $("sendBtn").disabled = true;
+    try{await generateLocalReply(item);}
+    finally{isGenerating = false;$("sendBtn").disabled = false;}
   }
   function clearAttachment(){
     selectedFile = null;
@@ -379,6 +498,8 @@
   $("content").addEventListener("scroll",updateScrollButton,{passive:true});
   $("scrollDownBtn").addEventListener("click",scrollBottom);
   window.addEventListener("resize",updateScrollButton);
+  $("aiStateBtn").addEventListener("click",()=>loadLocalAI().catch(()=>{}));
+  $("activateAiBtn").addEventListener("click",()=>loadLocalAI().catch(()=>{}));
   $("newChat").addEventListener("click",createConversation);
   $("historySearch").addEventListener("input",renderHistory);
   $("chatForm").addEventListener("submit",event => {event.preventDefault();sendMessage();});
