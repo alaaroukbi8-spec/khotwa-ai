@@ -99,6 +99,16 @@
     .chat-footer{text-align:center;color:#a1aab7;font-size:10px;padding:7px 0 0}
     .scroll-down{position:absolute;z-index:5;left:50%;bottom:148px;transform:translateX(-50%);width:38px;height:38px;border:1px solid #dce2e9;border-radius:50%;background:#fff;color:#435268;box-shadow:0 5px 18px #10182820;display:none;place-items:center;font-size:20px}.scroll-down.show{display:grid}.scroll-down:hover{background:#f0f5f5;color:var(--accent)}\n    .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 15px;border-radius:10px;font-size:12px;opacity:0;pointer-events:none;transition:.2s;z-index:30;box-shadow:var(--shadow)}
     .toast.show{opacity:1}
+    .account-btn{height:36px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#344054;font-size:12px;font-weight:650}.account-btn:hover{background:#f3f6f8;border-color:#cbd5e1}
+    .account-overlay{position:fixed;inset:0;z-index:50;background:rgba(10,20,36,.55);display:grid;place-items:center;padding:18px;backdrop-filter:blur(4px)}.account-overlay.hidden{display:none}
+    .account-card{width:min(410px,100%);background:#fff;border:1px solid #e5eaf0;border-radius:20px;padding:26px 22px 22px;box-shadow:0 22px 70px rgba(10,20,36,.25);position:relative;text-align:center;direction:rtl}
+    .account-close{position:absolute;left:14px;top:12px;width:30px;height:30px;border:0;border-radius:9px;background:#f1f4f7;color:#526174;font-size:21px}
+    .account-kicker{font-size:11px;letter-spacing:1.4px;font-weight:800;color:var(--accent);direction:ltr}.account-card h2{margin:10px 0 5px;font-size:24px;color:#1d2939}.account-description{font-size:13px;color:var(--muted);line-height:1.7;margin:0 0 16px}
+    .account-status{padding:12px;border:1px solid #f0dfc2;border-radius:11px;background:#fffaf1;color:#815b22;font-size:12px;line-height:1.8;text-align:right;margin-bottom:13px}
+    .google-button{height:44px;width:100%;border:1px solid #d4dae2;border-radius:11px;background:#fff;color:#273449;font-weight:650;display:flex;align-items:center;justify-content:center;gap:10px}.google-button:disabled{opacity:.5;cursor:not-allowed}
+    .google-g{font-weight:900;color:#4285f4;font-size:18px;font-family:Arial,sans-serif}.account-signout{height:40px;width:100%;border:1px solid var(--line);border-radius:10px;background:#f8fafc;color:#344054;margin-top:9px}
+    .account-footnote{font-size:10px;color:#98a2b3;line-height:1.8;margin:14px 2px 0}
+    @media(max-width:520px){.account-btn{padding:0 9px;font-size:11px}}
     .hidden{display:none!important}
     @media(max-width:820px){
       .app{grid-template-columns:1fr}
@@ -153,6 +163,7 @@
         <div class="page-name">KHOTWA AI</div>
       </div>
       <div class="top-actions">
+        <button class="account-btn" id="accountBtn" type="button">الحساب</button>
         <button class="engine-state" id="aiStateBtn" type="button" title="تشغيل نموذج ذكاء اصطناعي محلي على هذا الجهاز"><span class="status-dot" id="aiStatusDot"></span><span id="aiStatusText">تشغيل الذكاء الاصطناعي المحلي</span></button>
         <button class="icon-btn" id="clearBtn" type="button" title="حذف المحادثة الحالية" aria-label="حذف المحادثة الحالية">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
@@ -206,7 +217,22 @@
     </div>
   </main>
 </div>
+<div class="account-overlay hidden" id="accountOverlay" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+  <section class="account-card">
+    <button class="account-close" id="accountClose" type="button" aria-label="إغلاق">×</button>
+    <div class="account-kicker">KHOTWA AI</div>
+    <h2 id="accountTitle">حسابك</h2>
+    <p class="account-description">سجّل الدخول لحسابك عند تفعيل خدمة المصادقة.</p>
+    <div class="account-status" id="accountStatus">تسجيل الدخول عبر Google جاهز للربط، لكن إعداد Firebase لم يُضف بعد.</div>
+    <button class="google-button" id="googleSignInBtn" type="button" disabled>
+      <span class="google-g">G</span><span>المتابعة باستخدام Google</span>
+    </button>
+    <button class="account-signout hidden" id="googleSignOutBtn" type="button">تسجيل الخروج</button>
+    <p class="account-footnote" id="accountFootnote">يلزم إعداد مشروع Firebase وتفعيل Google Sign-In وإضافة إعدادات تطبيق الويب. لا تُدخل كلمة مرورك في KHOTWA AI.</p>
+  </section>
+</div>
 <div class="toast" id="toast" role="status"></div>
+<script src="firebase-config.js"></script>
 <script>
 (() => {
   "use strict";
@@ -727,6 +753,97 @@
   $("content").addEventListener("scroll",updateScrollButton,{passive:true});
   $("scrollDownBtn").addEventListener("click",scrollBottom);
   window.addEventListener("resize",updateScrollButton);
+  let firebaseAuthContextPromise = null;
+  let firebaseAuthContext = null;
+  const firebaseConfig = window.KHOTWA_FIREBASE_CONFIG || null;
+  function firebaseConfigIsReady(){
+    return !!(firebaseConfig && firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId);
+  }
+  function updateAccountState(user){
+    const status = $("accountStatus");
+    const signIn = $("googleSignInBtn");
+    const signOut = $("googleSignOutBtn");
+    if(user){
+      status.textContent = "تم تسجيل الدخول باسم " + (user.displayName || user.email || "مستخدم Google") + ".";
+      status.style.borderColor = "#b8e2d0";
+      status.style.background = "#effaf4";
+      status.style.color = "#166534";
+      signIn.classList.add("hidden");
+      signOut.classList.remove("hidden");
+      $("accountBtn").textContent = user.displayName ? user.displayName.split(" ")[0] : "حسابي";
+    }else{
+      status.textContent = firebaseConfigIsReady()
+        ? "يمكنك تسجيل الدخول باستخدام حساب Google."
+        : "تسجيل Google غير مفعّل بعد: يلزم إعداد مشروع Firebase وإضافة إعدادات تطبيق الويب.";
+      status.style.borderColor = "#f0dfc2";
+      status.style.background = "#fffaf1";
+      status.style.color = "#815b22";
+      signIn.classList.remove("hidden");
+      signIn.disabled = !firebaseConfigIsReady();
+      signOut.classList.add("hidden");
+      $("accountBtn").textContent = "الحساب";
+    }
+  }
+  async function getFirebaseAuthContext(){
+    if(!firebaseConfigIsReady()) return null;
+    if(firebaseAuthContext) return firebaseAuthContext;
+    if(firebaseAuthContextPromise) return firebaseAuthContextPromise;
+    firebaseAuthContextPromise = (async()=>{
+      const [appSdk,authSdk] = await Promise.all([
+        import("https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js"),
+        import("https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js")
+      ]);
+      const app = appSdk.getApps().length ? appSdk.getApp() : appSdk.initializeApp(firebaseConfig);
+      const auth = authSdk.getAuth(app);
+      authSdk.onAuthStateChanged(auth,user=>updateAccountState(user));
+      firebaseAuthContext = {auth,authSdk};
+      return firebaseAuthContext;
+    })().catch(error=>{
+      firebaseAuthContextPromise = null;
+      $("accountStatus").textContent = "تعذر تحميل Firebase Authentication: " + (error?.message || "خطأ غير معروف");
+      throw error;
+    });
+    return firebaseAuthContextPromise;
+  }
+  async function signInWithGoogle(){
+    const context = await getFirebaseAuthContext();
+    if(!context){
+      toast("لم يتم إعداد Firebase بعد. زر Google سيعمل بعد إضافة الإعدادات.");
+      return;
+    }
+    const provider = new context.authSdk.GoogleAuthProvider();
+    try{
+      if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
+        await context.authSdk.signInWithRedirect(context.auth,provider);
+      }else{
+        await context.authSdk.signInWithPopup(context.auth,provider);
+      }
+    }catch(error){
+      $("accountStatus").textContent = "تعذر تسجيل الدخول: " + (error?.message || "تحقق من إعداد Google في Firebase.");
+    }
+  }
+  async function signOutFromGoogle(){
+    const context = await getFirebaseAuthContext();
+    if(!context) return;
+    try{await context.authSdk.signOut(context.auth);toast("تم تسجيل الخروج.");}
+    catch(error){toast("تعذر تسجيل الخروج.");}
+  }
+  $("accountBtn").addEventListener("click",()=>{
+    $("accountOverlay").classList.remove("hidden");
+    if(!firebaseConfigIsReady()){
+      updateAccountState(null);
+    }else{
+      getFirebaseAuthContext().then(()=>{}).catch(()=>{});
+    }
+  });
+  $("accountClose").addEventListener("click",()=>$("accountOverlay").classList.add("hidden"));
+  $("accountOverlay").addEventListener("click",event=>{
+    if(event.target === $("accountOverlay")) $("accountOverlay").classList.add("hidden");
+  });
+  $("googleSignInBtn").addEventListener("click",signInWithGoogle);
+  $("googleSignOutBtn").addEventListener("click",signOutFromGoogle);
+  if(firebaseConfigIsReady()) getFirebaseAuthContext().catch(()=>{});
+  else updateAccountState(null);
   $("aiStateBtn").addEventListener("click",()=>loadLocalAI().catch(()=>{}));
   $("activateAiBtn").addEventListener("click",()=>loadLocalAI().catch(()=>{}));
   $("newChat").addEventListener("click",createConversation);
