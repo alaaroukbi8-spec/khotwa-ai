@@ -407,11 +407,11 @@
   }
   const SETTINGS_KEY = "khotwa-ai-settings-v1";
   function readSettings(){
-    const defaults = {replyLanguage:"auto",speed:"fast",theme:"system",autoStart:localStorage.getItem("khotwa-ai-auto-start")==="1",voiceLanguage:"fr-FR",memory:8,readAloud:false,speechRate:1};
+    const defaults = {replyLanguage:"auto",speed:"fast",theme:"system",autoStart:localStorage.getItem("khotwa-ai-auto-start")==="1",voiceLanguage:"fr-FR",memory:4,readAloud:false,speechRate:1};
     try{return {...defaults,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}")};}catch(error){return defaults;}
   }
   let appSettings = readSettings();
-  const LANGUAGE_NAMES = {fr:"Français",en:"English",ar:"العربية",es:"Español",de:"Deutsch",it:"Italiano",pt:"Português",tr:"Türkçe",ru:"русский",ja:"日本語",zh:"中文",hi:"हिन्दी",nl:"Nederlands",pl:"Polski",ko:"한국어",vi:"Tiếng Việt",id:"Bahasa Indonesia",bn:"বাংলা",th:"ไทย",he:"עברית",el:"Ελληνικά",fa:"فارسی",ur:"اردو",sw:"Kiswahili"};
+  const LANGUAGE_NAMES = {fr:"Français",en:"English",ar:"العربية",es:"Español",de:"Deutsch",it:"Italiano",pt:"Português",tr:"Türkçe",ru:"русский",ja:"日本語",zh:"中文",hi:"हिन्दी",nl:"Nederlands",pl:"Polski",ko:"한국어",vi:"Tiếng Việt",id:"Bahasa Indonesia",bn:"বাংলা",th:"ไทย",he:"עברית",el:"Ελληνικά",fa:"فارسی",ur:"اردو",sw:"Kiswahili",ta:"தமிழ்",te:"తెలుగు",ml:"മലയാളം"};
   function saveSettings(){
     try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(appSettings));}catch(error){}
     try{localStorage.setItem("khotwa-ai-auto-start",appSettings.autoStart?"1":"0");}catch(error){}
@@ -428,7 +428,7 @@
     $("settingAutoStart").checked=!!appSettings.autoStart;
     $("settingVoiceLang").value=appSettings.voiceLanguage;
     $("speechLang").value=appSettings.voiceLanguage;
-    $("settingMemory").value=String(appSettings.memory||8);
+    $("settingMemory").value=String(appSettings.memory||4);
     $("settingReadAloud").checked=!!appSettings.readAloud;
     applyTheme();
   }
@@ -439,9 +439,9 @@
   function generationOptions(){
     if(appSettings.speed==="detailed") return {max_tokens:560,temperature:0.45,top_p:0.88};
     if(appSettings.speed==="balanced") return {max_tokens:360,temperature:0.4,top_p:0.88};
-    return {max_tokens:220,temperature:0.3,top_p:0.85};
+    return {max_tokens:180,temperature:0.3,top_p:0.85};
   }
-  function memoryMessageCount(){return Math.max(4,Math.min(20,Number(appSettings.memory)||8));}
+  function memoryMessageCount(){return Math.max(4,Math.min(20,Number(appSettings.memory)||4));}
   function detectResponseLanguage(text){
     const sample = String(text || "").slice(0,2500).toLowerCase();
     if(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(sample)) return "العربية";
@@ -450,6 +450,13 @@
     if(/[\u4E00-\u9FFF]/.test(sample)) return "中文";
     if(/[\uAC00-\uD7AF]/.test(sample)) return "한국어";
     if(/[\u0900-\u097F]/.test(sample)) return "हिन्दी";
+    if(/[\u0980-\u09FF]/.test(sample)) return "বাংলা";
+    if(/[\u0E00-\u0E7F]/.test(sample)) return "ไทย";
+    if(/[\u0590-\u05FF]/.test(sample)) return "עברית";
+    if(/[\u0370-\u03FF]/.test(sample)) return "Ελληνικά";
+    if(/[\u0B80-\u0BFF]/.test(sample)) return "தமிழ்";
+    if(/[\u0C00-\u0C7F]/.test(sample)) return "తెలుగు";
+    if(/[\u0D00-\u0D7F]/.test(sample)) return "മലയാളം";
     if(/[\u0980-\u09FF]/.test(sample)) return "বাংলা";
     if(/[\u0E00-\u0E7F]/.test(sample)) return "ไทย";
     if(/[\u0590-\u05FF]/.test(sample)) return "עברית";
@@ -545,7 +552,7 @@
   }
   function speechLocaleFor(text){
     const name=responseLanguageFor(text);
-    const map={"Français":"fr-FR","English":"en-US","العربية":"ar-MA","Español":"es-ES","Português":"pt-PT","Deutsch":"de-DE","Italiano":"it-IT","Türkçe":"tr-TR","русский":"ru-RU","日本語":"ja-JP","中文":"zh-CN","हिन्दी":"hi-IN","Nederlands":"nl-NL","Polski":"pl-PL","한국어":"ko-KR","Tiếng Việt":"vi-VN","Bahasa Indonesia":"id-ID","বাংলা":"bn-BD","ไทย":"th-TH","עברית":"he-IL","Ελληνικά":"el-GR","فارسی":"fa-IR","اردو":"ur-PK","Kiswahili":"sw-KE"};
+    const map={"Français":"fr-FR","English":"en-US","العربية":"ar-MA","Español":"es-ES","Português":"pt-PT","Deutsch":"de-DE","Italiano":"it-IT","Türkçe":"tr-TR","русский":"ru-RU","日本語":"ja-JP","中文":"zh-CN","हिन्दी":"hi-IN","Nederlands":"nl-NL","Polski":"pl-PL","한국어":"ko-KR","Tiếng Việt":"vi-VN","Bahasa Indonesia":"id-ID","বাংলা":"bn-BD","ไทย":"th-TH","עברית":"he-IL","Ελληνικά":"el-GR","فارسی":"fa-IR","اردو":"ur-PK","Kiswahili":"sw-KE","தமிழ்":"ta-IN","తెలుగు":"te-IN","മലയാളം":"ml-IN"};
     return map[name]||navigator.language||"en-US";
   }
   function speakText(text,languageText){
