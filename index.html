@@ -652,40 +652,68 @@
     $("aiStateBtn").classList.toggle("ready",state === "ready");
     $("aiStateBtn").classList.toggle("error",state === "error");
   }
+  let cpuPipelinePromise = null;
+  async function loadCpuLocalAI(reason){
+    if(cpuPipelinePromise) return cpuPipelinePromise;
+    cpuPipelinePromise=(async()=>{
+      setAiStatus("تشغيل نموذج الذكاء الاصطناعي على المعالج","loading");
+      $("aiLoadInfo").classList.remove("hidden");
+      $("aiLoadText").textContent=reason+" جارٍ تنزيل نموذج CPU لأول مرة (حوالي 800 ميغابايت). سيُحفظ في ذاكرة المتصفح لتسريع الزيارات التالية.";
+      $("aiProgressBar").style.width="0%";
+      const transformers=await import("https://esm.sh/@huggingface/transformers@3.8.1");
+      const generator=await transformers.pipeline("text-generation","onnx-community/Qwen2.5-0.5B-Instruct",{
+        dtype:"q4",
+        progress_callback:progress=>{
+          const total=Number(progress?.total)||0, loaded=Number(progress?.loaded)||0;
+          const amount=total>0?Math.max(0,Math.min(100,loaded/total*100)):0;
+          if(amount>0){$("aiProgressBar").style.width=amount.toFixed(0)+"%";$("aiLoadText").textContent="جارٍ تنزيل نموذج CPU… "+amount.toFixed(0)+"%";}
+          else if(progress?.status){$("aiLoadText").textContent="جارٍ تجهيز نموذج CPU… "+progress.status;}
+        }
+      });
+      const engine={backend:"wasm",generator,TextStreamer:transformers.TextStreamer};
+      aiEngine=engine;
+      setAiStatus("الذكاء الاصطناعي جاهز عبر المعالج CPU","ready");
+      $("aiLoadText").textContent="تم تجهيز نموذج CPU. قد تكون الإجابات أبطأ من GPU، لكن لا يلزم دعم WebGPU.";
+      $("aiProgressBar").style.width="100%";
+      toast("أصبح KHOTWA AI جاهزاً عبر المعالج.");
+      return engine;
+    })().catch(error=>{cpuPipelinePromise=null;throw new Error("تعذر تشغيل نموذج CPU الاحتياطي: "+(error?.message||"خطأ غير معروف"));});
+    return cpuPipelinePromise;
+  }
   async function loadLocalAI(){
     if(aiEngine) return aiEngine;
     if(aiEnginePromise) return aiEnginePromise;
-    aiEnginePromise = (async () => {
-      if(!window.isSecureContext) throw new Error("افتح التطبيق من رابط HTTPS لتشغيل النموذج المحلي.");
-      if(!navigator.gpu) throw new Error("هذا المتصفح أو الجهاز لا يدعم WebGPU. استخدم إصداراً حديثاً من Chrome وجهازاً متوافقاً.");
-      const adapter = await navigator.gpu.requestAdapter();
-      if(!adapter) throw new Error("لم يتم العثور على معالج رسومي يدعم WebGPU في هذا الجهاز.");
-      setAiStatus("جارٍ تجهيز النموذج…","loading");
+    aiEnginePromise=(async()=>{
+      if(!window.isSecureContext) throw new Error("افتح التطبيق من رابط HTTPS لتشغيل الذكاء الاصطناعي.");
       $("aiLoadInfo").classList.remove("hidden");
-      $("aiLoadText").textContent = "جارٍ تحميل مكتبة النموذج… قد يستغرق التنزيل الأول وقتاً ويستهلك بيانات إنترنت.";
-      $("aiProgressBar").style.width = "0%";
-      const webllm = await import("https://esm.run/@mlc-ai/web-llm");
-      const engine = await webllm.CreateMLCEngine(LOCAL_MODEL_ID,{
-        initProgressCallback:(progress)=>{
-          const amount = Number.isFinite(progress?.progress) ? Math.max(0,Math.min(100,progress.progress*100)) : 0;
-          $("aiProgressBar").style.width = amount.toFixed(0) + "%";
-          $("aiLoadText").textContent = progress?.text || ("جارٍ تنزيل النموذج… " + amount.toFixed(0) + "%");
-          setAiStatus(amount ? "جارٍ تنزيل النموذج " + amount.toFixed(0) + "%" : "جارٍ تحميل النموذج…","loading");
-        }
-      });
-      aiEngine = engine;
-      setAiStatus("الذكاء الاصطناعي متصل محلياً","ready");
-      $("aiLoadText").textContent = "تم تحميل النموذج. تتم معالجة الرسائل على هذا الجهاز.";
-      $("aiProgressBar").style.width = "100%";
-      toast("أصبح KHOTWA AI جاهزاً للإجابة محلياً.");
-      return engine;
+      $("aiProgressBar").style.width="0%";
+      if(!navigator.gpu) return await loadCpuLocalAI("هذا الجهاز لا يدعم WebGPU.");
+      let adapter=null;
+      try{adapter=await navigator.gpu.requestAdapter();}catch(error){adapter=null;}
+      if(!adapter) return await loadCpuLocalAI("لم يتم العثور على معالج رسومي متوافق مع WebGPU.");
+      try{
+        setAiStatus("جارٍ تجهيز النموذج على GPU…","loading");
+        $("aiLoadText").textContent="جارٍ تحميل النموذج المحلي على بطاقة الرسوميات…";
+        const webllm=await import("https://esm.run/@mlc-ai/web-llm");
+        const engine=await webllm.CreateMLCEngine(LOCAL_MODEL_ID,{
+          initProgressCallback:progress=>{
+            const amount=Number.isFinite(progress?.progress)?Math.max(0,Math.min(100,progress.progress*100)):0;
+            $("aiProgressBar").style.width=amount.toFixed(0)+"%";
+            $("aiLoadText").textContent=progress?.text||("جارٍ تنزيل النموذج… "+amount.toFixed(0)+"%");
+            setAiStatus(amount?"جارٍ تنزيل النموذج "+amount.toFixed(0)+"%":"جارٍ تحميل النموذج…","loading");
+          }
+        });
+        aiEngine=engine;setAiStatus("الذكاء الاصطناعي جاهز عبر GPU","ready");
+        $("aiLoadText").textContent="تم تحميل النموذج المحلي بنجاح.";$("aiProgressBar").style.width="100%";
+        toast("أصبح KHOTWA AI جاهزاً للإجابة.");return engine;
+      }catch(webgpuError){
+        $("aiLoadText").textContent="تعذر تشغيل GPU. جارٍ تجربة نموذج CPU الاحتياطي…";
+        return await loadCpuLocalAI("تعذر تشغيل نموذج GPU.");
+      }
     })().catch(error=>{
-      aiEnginePromise = null;
-      setAiStatus("تعذر تشغيل النموذج","error");
-      $("aiLoadInfo").classList.remove("hidden");
-      $("aiLoadText").textContent = error?.message || "حدث خطأ أثناء تشغيل النموذج.";
-      toast(error?.message || "تعذر تحميل نموذج الذكاء الاصطناعي.");
-      throw error;
+      aiEnginePromise=null;setAiStatus("تعذر تشغيل النموذج","error");
+      $("aiLoadInfo").classList.remove("hidden");$("aiLoadText").textContent=error?.message||"حدث خطأ أثناء تشغيل الذكاء الاصطناعي.";
+      toast(error?.message||"تعذر تحميل نموذج الذكاء الاصطناعي.");throw error;
     });
     return aiEnginePromise;
   }
@@ -758,19 +786,33 @@
     try{
       const responseLanguage = responseLanguageFor(latestUserText(conversation));
       const languageInstruction = AI_SYSTEM_PROMPT + " RESPONSE LANGUAGE FOR THIS TURN: " + responseLanguage + ". Reply exclusively in that language unless the user requests otherwise.";
-      const stream = await engine.chat.completions.create({
-        messages:[{role:"system",content:languageInstruction},...history],
-        stream:true,
-        ...generationOptions()
-      });
-      bubble.textContent = "";
-      for await (const chunk of stream){
-        const part = chunk.choices?.[0]?.delta?.content || "";
-        if(part){
-          if(!gotFirstToken){gotFirstToken=true;window.clearTimeout(thinkingTimer);bubble.classList.remove("thinking");}
-          assistantMessage.text += part;
-          bubble.textContent = assistantMessage.text;
-          updateScrollButton();
+      if(engine.backend==="wasm"){
+        $("aiLoadText").textContent="تم تجهيز نموذج CPU. جارٍ توليد الإجابة…";
+        const options=generationOptions();
+        const streamer=new engine.TextStreamer(engine.generator.tokenizer,{skip_prompt:true,callback_function:part=>{
+          if(part){
+            if(!gotFirstToken){gotFirstToken=true;window.clearTimeout(thinkingTimer);bubble.classList.remove("thinking");}
+            assistantMessage.text+=part;bubble.textContent=assistantMessage.text;updateScrollButton();
+          }
+        }});
+        const generated=await engine.generator([{role:"system",content:languageInstruction},...history],{
+          max_new_tokens:options.max_tokens,do_sample:true,temperature:options.temperature,top_p:options.top_p,repetition_penalty:1.08,streamer
+        });
+        if(!assistantMessage.text.trim()){
+          const output=generated?.[0]?.generated_text;
+          if(Array.isArray(output)) assistantMessage.text=([...output].reverse().find(item=>item?.role==="assistant")?.content||"");
+          else if(typeof output==="string") assistantMessage.text=output;
+          bubble.textContent=assistantMessage.text;
+        }
+      }else{
+        const stream=await engine.chat.completions.create({messages:[{role:"system",content:languageInstruction},...history],stream:true,...generationOptions()});
+        bubble.textContent="";
+        for await(const chunk of stream){
+          const part=chunk.choices?.[0]?.delta?.content||"";
+          if(part){
+            if(!gotFirstToken){gotFirstToken=true;window.clearTimeout(thinkingTimer);bubble.classList.remove("thinking");}
+            assistantMessage.text+=part;bubble.textContent=assistantMessage.text;updateScrollButton();
+          }
         }
       }
       if(!assistantMessage.text.trim()){assistantMessage.text = "لم يُنتج النموذج إجابة. اضغط «إعادة المحاولة» أو أعد صياغة السؤال.";assistantMessage.retryable=true;renderConversation();}
@@ -984,7 +1026,20 @@
     try{await generateLocalReply(item);}
     finally{isGenerating = false;$("sendBtn").disabled = false;}
   }
-  async function summarizeCurrentConversation(){const conversation=currentConversation();if(!conversation||!conversation.messages.length){toast("Aucune conversation à résumer.");return;}if(isGenerating){toast("Attendez la fin de la réponse en cours.");return;}isGenerating=true;$("summaryBtn").disabled=true;$("sendBtn").disabled=true;let summaryMessage=null;try{const engine=await loadLocalAI();const lang=responseLanguageFor(latestUserText(conversation));const transcript=conversation.messages.filter(m=>m.role==="user"||m.role==="assistant").map(m=>(m.role==="user"?"User: ":"Assistant: ")+(m.text||"")+(m.pdfExtractedText?"\\nDocument extract: "+m.pdfExtractedText.slice(0,5000):"")).join("\\n\\n").slice(-18000);summaryMessage={role:"assistant",text:"",createdAt:Date.now()};conversation.messages.push(summaryMessage);const row=addMessageToView(summaryMessage,conversation.messages.length-1);const bubble=row.querySelector(".bubble");bubble.textContent="Préparation du résumé…";scrollBottom();const stream=await engine.chat.completions.create({messages:[{role:"system",content:"You are KHOTWA AI. Summarize only facts in this conversation. Write a useful, structured, concise summary in "+lang+". Include the topic, key information, decisions, open questions, and next steps when present. Do not invent facts."},{role:"user",content:transcript}],stream:true,temperature:0.25,max_tokens:420});bubble.textContent="";for await(const chunk of stream){const part=chunk.choices?.[0]?.delta?.content||"";if(part){summaryMessage.text+=part;bubble.textContent=summaryMessage.text;updateScrollButton();}}if(!summaryMessage.text.trim())summaryMessage.text="The model did not produce a summary. Please try again.";bubble.textContent=summaryMessage.text;}catch(error){if(summaryMessage)conversation.messages=conversation.messages.filter(m=>m!==summaryMessage);toast(error?.message||"Impossible de créer le résumé.");}finally{conversation.updatedAt=Date.now();persist();renderHistory();renderConversation();isGenerating=false;$("summaryBtn").disabled=false;$("sendBtn").disabled=false;scrollBottom();}}
+  async function summarizeCurrentConversation(){const conversation=currentConversation();if(!conversation||!conversation.messages.length){toast("Aucune conversation à résumer.");return;}if(isGenerating){toast("Attendez la fin de la réponse en cours.");return;}isGenerating=true;$("summaryBtn").disabled=true;$("sendBtn").disabled=true;let summaryMessage=null;try{const engine=await loadLocalAI();const lang=responseLanguageFor(latestUserText(conversation));const transcript=conversation.messages.filter(m=>m.role==="user"||m.role==="assistant").map(m=>(m.role==="user"?"User: ":"Assistant: ")+(m.text||"")+(m.pdfExtractedText?"\\nDocument extract: "+m.pdfExtractedText.slice(0,5000):"")).join("\\n\\n").slice(-18000);summaryMessage={role:"assistant",text:"",createdAt:Date.now()};conversation.messages.push(summaryMessage);const row=addMessageToView(summaryMessage,conversation.messages.length-1);const bubble=row.querySelector(".bubble");bubble.textContent="Préparation du résumé…";scrollBottom();const summaryPrompt="You are KHOTWA AI. Summarize only facts in this conversation. Write a useful, structured, concise summary in "+lang+". Include the topic, key information, decisions, open questions, and next steps when present. Do not invent facts.";
+      if(engine.backend==="wasm"){
+        const streamer=new engine.TextStreamer(engine.generator.tokenizer,{skip_prompt:true,callback_function:part=>{if(part){summaryMessage.text+=part;bubble.textContent=summaryMessage.text;updateScrollButton();}}});
+        const generated=await engine.generator([{role:"system",content:summaryPrompt},{role:"user",content:transcript}],{max_new_tokens:180,do_sample:false,repetition_penalty:1.08,streamer});
+        if(!summaryMessage.text.trim()){
+          const output=generated?.[0]?.generated_text;
+          summaryMessage.text=Array.isArray(output)?([...output].reverse().find(item=>item?.role==="assistant")?.content||""):(typeof output==="string"?output:"");
+        }
+      }else{
+        const stream=await engine.chat.completions.create({messages:[{role:"system",content:summaryPrompt},{role:"user",content:transcript}],stream:true,temperature:0.25,max_tokens:420});
+        for await(const chunk of stream){const part=chunk.choices?.[0]?.delta?.content||"";if(part){summaryMessage.text+=part;bubble.textContent=summaryMessage.text;updateScrollButton();}}
+      }
+      if(!summaryMessage.text.trim())summaryMessage.text="The model did not produce a summary. Please try again.";
+      bubble.textContent=summaryMessage.text;}catch(error){if(summaryMessage)conversation.messages=conversation.messages.filter(m=>m!==summaryMessage);toast(error?.message||"Impossible de créer le résumé.");}finally{conversation.updatedAt=Date.now();persist();renderHistory();renderConversation();isGenerating=false;$("summaryBtn").disabled=false;$("sendBtn").disabled=false;scrollBottom();}}
   function clearAttachment(){
     selectedFile = null;
     $("fileInput").value = "";
