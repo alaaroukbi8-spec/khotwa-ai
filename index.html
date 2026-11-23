@@ -457,9 +457,9 @@
         .filter(item => typeof item.str === "string")
         .map(item => item.str)
         .join(" ")
-        .replace(/\\s+/g," ")
+        .replace(/\s+/g," ")
         .trim();
-      if(pageText) extracted += "\\n[الصفحة " + pageNumber + "]\\n" + pageText;
+      if(pageText) extracted += "\n[الصفحة " + pageNumber + "]\\n" + pageText;
       if(extracted.length >= 10000){
         extracted = extracted.slice(0,10000);
         break;
@@ -475,7 +475,7 @@
         role:message.role,
         content:[
           message.text || (message.pdfExtractedText ? "حلّل ملف PDF المرفق وأجب عن الأسئلة التالية." : ""),
-          message.pdfExtractedText ? "\\n\\nنص مستخرج من ملف PDF (مقتطف محلي):\\n" + message.pdfExtractedText : ""
+          message.pdfExtractedText ? "\n\\nنص مستخرج من ملف PDF (مقتطف محلي):\\n" + message.pdfExtractedText : ""
         ].join("")
       }));
     let engine;
@@ -684,7 +684,7 @@
       }
       return;
     }
-    if(attachedFile && (attachedFile.type === "text/plain" || attachedFile.type === "text/csv" || /\\.(txt|csv)$/i.test(attachedFile.name))){
+    if(attachedFile && (attachedFile.type === "text/plain" || attachedFile.type === "text/csv" || /\.(txt|csv)$/i.test(attachedFile.name))){
       isGenerating = true;
       $("sendBtn").disabled = true;
       try{
